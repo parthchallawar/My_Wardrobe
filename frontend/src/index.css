@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-black-700;
+  }
+
+  body {
+    @apply bg-black-800 text-gray-100;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-black-700;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-neon-green;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-neon-greenDark;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-neon-green text-black-800;
+  }
+
+  /* Input autofill */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #39FF14;
+    -webkit-box-shadow: 0 0 0px 1000px #0a0a0a inset;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+}
+
+@layer components {
+  /* Button styles */
+  .btn-primary {
+    @apply bg-neon-green text-black-800 font-semibold px-6 py-3 rounded-lg
+           transition-all duration-300 ease-out
+           hover:bg-neon-greenDark hover:shadow-neon
+           active:scale-95
+           hover:tracking-wider;
+  }
+
+  .btn-secondary {
+    @apply bg-transparent border-2 border-neon-green text-neon-green font-semibold px-6 py-3 rounded-lg
+           transition-all duration-300 ease-out
+           hover:bg-neon-green hover:text-black-800 hover:shadow-neon
+           active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-gray-300 hover:text-neon-green
+           transition-all duration-200 ease-out
+           active:scale-95;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-black-700 rounded-xl border border-gray-700
+           hover:border-neon-green/50 transition-all duration-300 ease-out
+           hover:shadow-neon-sm hover:translate-y-[-2px];
+  }
+
+  .card-glow {
+    @apply card shadow-neon-sm;
+  }
+
+  /* Input styles */
+  .input-primary {
+    @apply bg-black-600 border-2 border-gray-700 rounded-lg px-4 py-3 text-gray-100
+           focus:border-neon-green focus:shadow-neon-sm outline-none
+           transition-all duration-300 ease-out
+           placeholder-gray-500;
+  }
+
+  /* Glow text */
+  .text-glow {
+    text-shadow: 0 0 10px #39FF14, 0 0 20px #39FF14;
+  }
+
+  /* Grid patterns */
+  .grid-pattern {
+    background-image:
+      linear-gradient(rgba(57, 255, 20, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(57, 255, 20, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* Animated border */
+  .animated-border {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .animated-border::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #39FF14, transparent, #39FF14);
+    background-size: 400% 400%;
+    z-index: -1;
+    animation: gradientBorder 3s ease infinite;
+    border-radius: inherit;
+  }
+
+  @keyframes gradientBorder {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+}
+
+@layer utilities {
+  /* Glass morphism */
+  .glass {
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .glass-light {
+    background: rgba(20, 20, 20, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Neon outline */
+  .neon-outline {
+    outline: none;
+    box-shadow: 0 0 0 2px #39FF14, 0 0 20px rgba(57, 255, 20, 0.3);
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Loading shimmer */
+  .shimmer {
+    background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+}
+
+/* Loading spinner */
+.spinner {
+  border: 3px solid rgba(57, 255, 20, 0.1);
+  border-top-color: #39FF14;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Tooltip */
+.tooltip {
+  position: relative;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background: #39FF14;
+  color: #000;
+  font-size: 12px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+}
