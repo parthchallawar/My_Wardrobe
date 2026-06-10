@@ -31,6 +31,7 @@ const Wardrobe = () => {
   );
 
   const items = data?.data?.items || [];
+  const getColorValue = (color) => color?.hex || color?.primary || color?.value || '#000000';
 
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -245,7 +246,7 @@ const Wardrobe = () => {
                     <div
                       key={i}
                       className="w-3 h-3 rounded-full border border-gray-600"
-                      style={{ backgroundColor: color.primary }}
+                      style={{ backgroundColor: getColorValue(color) }}
                     />
                   ))}
                   {item.colors?.length > 3 && (

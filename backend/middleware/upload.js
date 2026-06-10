@@ -1,159 +1,109 @@
 const multer = require('multer');
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-require('dotenv').config();
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUD_API_KEY,
-  api_secret: process.env.CLOUD_API_SECRET,
-});
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const IMAGE_FIELD = 'image';
+const IMAGES_FIELD = 'images';
 
-// Configure Cloudinary storage for items
-const itemImageStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'wardrobe-ai/items',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
-    public_id: (req, file) => `item-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
-    transformation: [
-      { width: 1200, height: 1200, crop: 'limit', quality: 'auto' }
-    ],
-    resource_type: 'image'
-  },
-});
+const storage = multer.memoryStorage();
 
-// Configure Cloudinary storage for multiple uploads
-const itemMultipleImageStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'wardrobe-ai/items',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
-    public_id: (req, file) => `item-${Date.now()}-${Math.round(Math.random() * 1E9)}-${file.originalname}`,
-    transformation: [
-      { width: 1200, height: 1200, crop: 'limit', quality: 'auto' }
-    ],
-    resource_type: 'image'
-  },
-});
-
-// File filter
 const fileFilter = (req, file, cb) => {
-  // Accept images only
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed'), false);
+  if (file && typeof file.mimetype === 'string' && file.mimetype.startsWith('image/')) {
+    return cb(null, true);
+  }
+
+  cb(new Error('Only image files are allowed'));
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: MAX_FILE_SIZE
+  }
+});
+
+const toDataUrl = (file) => {
+  if (!file || !Buffer.isBuffer(file.buffer)) {
+    return file;
+  }
+
+  const encoded = file.buffer.toString('base64');
+  const dataUrl = `data:${file.mimetype};base64,${encoded}`;
+
+  return {
+    ...file,
+    filename: file.originalname,
+    path: dataUrl,
+    url: dataUrl
+  };
+};
+
+const normalizeFiles = (req) => {
+  if (req.file) {
+    req.file = toDataUrl(req.file);
+  }
+
+  if (Array.isArray(req.files)) {
+    req.files = req.files.map(toDataUrl);
   }
 };
 
-// Create multer instances
-const uploadSingle = multer({
-  storage: itemImageStorage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-    files: 1
+const handleMulterError = (res, err, sizeLimitMessage) => {
+  if (!err) {
+    return false;
   }
-});
 
-const uploadMultiple = multer({
-  storage: itemMultipleImageStorage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit per file
-    files: 5 // Max 5 files per upload
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    res.status(400).json({ error: sizeLimitMessage });
+    return true;
   }
-});
 
-// Old multer for backward compatibility (local storage)
-const uploadLocal = multer({
-  storage: multer.memoryStorage(),
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024,
-    files: 5
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    res.status(400).json({ error: 'Unexpected file field name.' });
+    return true;
   }
-});
 
-// Middleware to handle single image upload
+  res.status(400).json({ error: err.message || 'Invalid upload file' });
+  return true;
+};
+
 const handleUpload = (req, res, next) => {
-  uploadSingle.single('image')(req, res, (err) => {
-    if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'File size too large. Maximum 10MB allowed.' });
-      }
-      if (err.code === 'LIMIT_FILE_COUNT') {
-        return res.status(400).json({ error: 'Too many files. Maximum 1 file allowed.' });
-      }
-      return res.status(400).json({ error: err.message });
+  upload.single(IMAGE_FIELD)(req, res, (err) => {
+    if (handleMulterError(res, err, 'File too large. Maximum 5MB allowed.')) {
+      return;
     }
+
+    normalizeFiles(req);
     next();
   });
 };
 
-// Middleware to handle multiple image uploads
 const handleMultipleUpload = (req, res, next) => {
-  uploadMultiple.array('images', 5)(req, res, (err) => {
-    if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'File size too large. Maximum 10MB allowed per file.' });
-      }
-      if (err.code === 'LIMIT_FILE_COUNT') {
-        return res.status(400).json({ error: 'Too many files. Maximum 5 files allowed.' });
-      }
-      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-        return res.status(400).json({ error: 'Unexpected file field name. Use "images" for multiple uploads.' });
-      }
-      return res.status(400).json({ error: err.message });
+  upload.array(IMAGES_FIELD, 5)(req, res, (err) => {
+    if (handleMulterError(res, err, 'File too large. Maximum 5MB allowed per file.')) {
+      return;
     }
+
+    normalizeFiles(req);
     next();
   });
 };
 
-// Helper function to delete image from Cloudinary
-const deleteImage = async (publicId) => {
-  try {
-    const result = await cloudinary.uploader.destroy(publicId);
-    return result;
-  } catch (error) {
-    console.error('Error deleting image from Cloudinary:', error);
-    throw error;
-  }
-};
+const deleteImages = async () => ({ deleted: [] });
 
-// Helper function to delete multiple images from Cloudinary
-const deleteImages = async (publicIds) => {
-  try {
-    const result = await cloudinary.api.delete_resources(publicIds);
-    return result;
-  } catch (error) {
-    console.error('Error deleting images from Cloudinary:', error);
-    throw error;
-  }
-};
+upload.handleUpload = handleUpload;
+upload.handleMultipleUpload = handleMultipleUpload;
+upload.deleteImages = deleteImages;
+upload.uploadLocal = upload;
+upload.default = upload;
+upload.singleUpload = handleUpload;
+upload.multipleUpload = handleMultipleUpload;
+upload.single = upload.single.bind(upload);
+upload.array = upload.array.bind(upload);
 
-// Helper function to delete folder from Cloudinary
-const deleteFolder = async (folder) => {
-  try {
-    const result = await cloudinary.api.delete_resources_by_prefix(folder);
-    await cloudinary.api.delete_folder(folder);
-    return result;
-  } catch (error) {
-    console.error('Error deleting folder from Cloudinary:', error);
-    throw error;
-  }
-};
-
-module.exports = {
-  uploadSingle,
-  uploadMultiple,
-  uploadLocal,
-  handleUpload,
-  handleMultipleUpload,
-  deleteImage,
-  deleteImages,
-  deleteFolder,
-  cloudinary
-};
+module.exports = upload;
+module.exports.default = upload;
+module.exports.handleUpload = handleUpload;
+module.exports.handleMultipleUpload = handleMultipleUpload;
+module.exports.deleteImages = deleteImages;
+module.exports.uploadLocal = upload;

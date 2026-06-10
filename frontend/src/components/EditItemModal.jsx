@@ -8,6 +8,29 @@ import toast from 'react-hot-toast';
 
 const EditItemModal = ({ isOpen, onClose, item }) => {
   const queryClient = useQueryClient();
+  const getImageUrl = (imageUrl) => {
+    if (!imageUrl) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:')) {
+      return imageUrl;
+    }
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    return `${API_BASE_URL}${imageUrl}`;
+  };
+
+  const getColorValue = (color) => color?.hex || color?.primary || color?.value || '#000000';
+  const hexToRgb = (hex) => {
+    const normalized = (hex || '#000000').replace('#', '');
+    const value = normalized.length === 3
+      ? normalized.split('').map((char) => char + char).join('')
+      : normalized.padEnd(6, '0').slice(0, 6);
+
+    return {
+      r: parseInt(value.slice(0, 2), 16) || 0,
+      g: parseInt(value.slice(2, 4), 16) || 0,
+      b: parseInt(value.slice(4, 6), 16) || 0,
+    };
+  };
+
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -28,18 +51,14 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
         name: item.name || '',
         category: item.category || '',
         style: item.style || '',
-        color: item.colors?.[0]?.primary || '#000000',
+        color: getColorValue(item.colors?.[0]),
         brand: item.brand || '',
         season: item.season?.[0] || '',
         tags: item.tags?.join(', ') || '',
         notes: item.notes || '',
       });
       if (item.images?.[0]?.url) {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const fullImageUrl = item.images[0].url.startsWith('http')
-          ? item.images[0].url
-          : `${API_BASE_URL}${item.images[0].url}`;
-        setPreviewUrl(fullImageUrl);
+        setPreviewUrl(getImageUrl(item.images[0].url));
       }
     }
   }, [item]);
@@ -116,7 +135,7 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
         name: itemData.name,
         category: itemData.category,
         style: itemData.style,
-        colors: [{ primary: itemData.color, secondary: itemData.color }],
+        colors: [{ hex: itemData.color, rgb: hexToRgb(itemData.color), percentage: 100 }],
         brand: itemData.brand,
         season: itemData.season ? [itemData.season] : undefined,
         tags: itemData.tags ? itemData.tags.split(',').map(tag => tag.trim()) : [],
@@ -151,11 +170,7 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
       URL.revokeObjectURL(previewUrl);
       // Restore original image if exists
       if (item?.images?.[0]?.url) {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const fullImageUrl = item.images[0].url.startsWith('http')
-          ? item.images[0].url
-          : `${API_BASE_URL}${item.images[0].url}`;
-        setPreviewUrl(fullImageUrl);
+        setPreviewUrl(getImageUrl(item.images[0].url));
       }
     }
   };
