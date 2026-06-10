@@ -33,14 +33,15 @@ const ItemDetail = () => {
   // Helper function to get full image URL (Cloudinary URLs are already full URLs)
   const getImageUrl = (imageUrl) => {
     if (!imageUrl) return null;
-    // Cloudinary URLs are absolute URLs, return as is
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:')) {
       return imageUrl;
     }
     // Fallback for relative URLs
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     return `${API_BASE_URL}${imageUrl}`;
   };
+
+  const getColorValue = (color) => color?.hex || color?.primary || color?.value || '#000000';
 
   const { data, isLoading, error } = useQuery(
     ['item', id],
@@ -319,10 +320,10 @@ const ItemDetail = () => {
                   >
                     <div
                       className="w-10 h-10 rounded-lg border-2 border-gray-600"
-                      style={{ backgroundColor: color.primary }}
+                      style={{ backgroundColor: getColorValue(color) }}
                     />
                     <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-black-800 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      {color.primary}
+                      {getColorValue(color)}
                     </span>
                   </div>
                 ))}
