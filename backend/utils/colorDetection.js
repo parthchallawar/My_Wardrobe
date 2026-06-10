@@ -21,6 +21,15 @@ const resolveImageInput = async (imageInput) => {
     throw new Error('Image input is empty');
   }
 
+  if (/^data:image\//i.test(trimmedInput)) {
+    const base64Index = trimmedInput.indexOf('base64,');
+    if (base64Index === -1) {
+      throw new Error('Invalid data URL image input');
+    }
+
+    return Buffer.from(trimmedInput.slice(base64Index + 7), 'base64');
+  }
+
   if (/^https?:\/\//i.test(trimmedInput)) {
     const response = await axios.get(trimmedInput, {
       responseType: 'arraybuffer',
