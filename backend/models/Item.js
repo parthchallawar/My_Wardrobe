@@ -63,11 +63,25 @@ const itemSchema = new mongoose.Schema({
     type: String,
     enum: ['cotton', 'polyester', 'denim', 'wool', 'silk', 'linen', 'leather', 'synthetic', 'blend']
   },
+  
+  // --- New AI-Analyzed Fields ---
+  imageUrl: { type: String },
+  imageBase64: { type: String },
+  aiAnalyzed: { type: Boolean, default: false },
+  colorHex: { type: String },
+  colorName: { type: String },
+  pattern: {
+    type: String,
+    enum: ["solid", "striped", "checkered", "floral", "graphic print", "camouflage", "abstract", "polka dots"],
+    default: "solid"
+  },
+  // ------------------------------
+
   brand: { type: String, default: null },
   size: { type: String, default: null },
   season: [{
     type: String,
-    enum: ['spring', 'summer', 'fall', 'winter', 'all-season']
+    enum: ['spring', 'summer', 'fall', 'winter', 'all-season', 'spring/autumn', 'all']
   }],
   occasion: [{
     type: String,

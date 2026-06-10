@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Shirt, Plus, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Shirt, Plus, Upload, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { useMutation, useQueryClient } from 'react-query';
 import { itemsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
+import ImageUploadAnalyzer from './ImageUploadAnalyzer';
 
 const AddItemModal = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient();
@@ -12,10 +13,15 @@ const AddItemModal = ({ isOpen, onClose }) => {
     category: '',
     style: '',
     color: '#000000',
+    colorName: '',
+    pattern: 'solid',
     brand: '',
     season: '',
     tags: '',
+    imageBase64: '',
   });
+  const [isAiPrefilled, setIsAiPrefilled] = useState(false);
+  const [showAiBanner, setShowAiBanner] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -37,12 +43,17 @@ const AddItemModal = ({ isOpen, onClose }) => {
 
     const itemData = {
       name: formData.name,
-      category: formData.category,
+      category: formData.category, // Map type to category or keep as category
       style: formData.style,
       color: formData.color,
+      colorName: formData.colorName || undefined,
+      colorHex: formData.color,
+      pattern: formData.pattern,
       brand: formData.brand || undefined,
       season: formData.season || undefined,
       tags: formData.tags || undefined,
+      imageBase64: formData.imageBase64 || undefined,
+      aiAnalyzed: isAiPrefilled,
     };
 
     if (selectedFiles.length > 0) {
@@ -64,16 +75,39 @@ const AddItemModal = ({ isOpen, onClose }) => {
     } else {
       // Use regular endpoint
       const finalData = {
-        name: itemData.name,
-        category: itemData.category,
-        style: itemData.style,
-        colors: [{ primary: itemData.color, secondary: itemData.color }],
-        brand: itemData.brand,
+        ...itemData,
+        colors: [{ hex: itemData.color, rgb: { r: 0, g: 0, b: 0 } }], // simplified adapter for backend compat
         season: itemData.season ? [itemData.season] : undefined,
         tags: itemData.tags ? itemData.tags.split(',').map(tag => tag.trim()) : [],
       };
       addMutation.mutate({ data: finalData, files: [] });
     }
+  };
+
+  const handleAnalysisComplete = (data) => {
+    // Basic category mapping from AI type
+    const aiType = data.type || '';
+    let categoryMap = '';
+    if (['t-shirt', 'shirt', 'sweater', 'vest'].includes(aiType)) categoryMap = 'tops';
+    else if (['jacket', 'coat'].includes(aiType)) categoryMap = 'outerwear';
+    else if (['pants', 'shorts', 'skirt'].includes(aiType)) categoryMap = 'bottoms';
+    else if (['dress', 'jumpsuit'].includes(aiType)) categoryMap = 'dresses';
+    else if (['shoes'].includes(aiType)) categoryMap = 'shoes';
+    else if (['bag', 'hat', 'scarf', 'belt'].includes(aiType)) categoryMap = 'accessories';
+
+    setFormData(prev => ({
+      ...prev,
+      category: categoryMap || prev.category,
+      name: prev.name || (data.type ? `My ${data.colorName || ''} ${data.type}`.trim() : ''),
+      style: data.style || prev.style,
+      color: data.colorHex || prev.color,
+      colorName: data.colorName || prev.colorName,
+      pattern: data.pattern !== 'solid color' ? data.pattern : 'solid',
+      season: data.season === 'spring autumn transitional clothing' ? 'all-season' : (data.season || prev.season),
+      imageBase64: data.imageBase64 || prev.imageBase64,
+    }));
+    setIsAiPrefilled(true);
+    setShowAiBanner(true);
   };
 
   const handleFileSelect = (e) => {

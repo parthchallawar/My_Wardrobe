@@ -144,6 +144,7 @@ export const aiAPI = {
   recommendPurchases: (data) => api.post('/ai/recommend-purchases', data),
   getColors: () => api.get('/ai/colors'),
   getSeasonalGuide: () => api.get('/ai/seasonal-guide'),
+  analyzeImage: (formData) => api.post('/analyze', formData),
 };
 
 // Users API
