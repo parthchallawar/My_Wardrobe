@@ -212,7 +212,22 @@ const AddItemModal = ({ isOpen, onClose }) => {
             </motion.button>
           </div>
 
-          {/* Form */}
+            {/* Form */}
+            {showAiBanner && (
+              <div className="flex items-center justify-between bg-black-800 border-l-4 border-neon-green p-3 mb-4 rounded">
+                <span className="text-sm text-gray-300">
+                  Fields auto-filled by AI — please review before saving
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAiBanner(false)}
+                  className="text-gray-400 hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            <ImageUploadAnalyzer onAnalysisComplete={handleAnalysisComplete} />
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Name */}
             <div>

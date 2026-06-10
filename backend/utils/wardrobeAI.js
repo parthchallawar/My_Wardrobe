@@ -295,6 +295,153 @@ class WardrobeAI {
   }
 
   /**
+   * Helper to convert HEX to HSL
+   */
+  static hexToHsl(hex) {
+    if (!hex) return null;
+    hex = hex.replace(/^#/, '');
+    let r = 0, g = 0, b = 0;
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6) {
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+    } else {
+      return null;
+    }
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) {
+      h = s = 0; 
+    } else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return { h: h * 360, s: s * 100, l: l * 100 };
+  }
+
+  static isNeutralColor(hex, colorName) {
+    if (colorName) {
+      const name = colorName.toLowerCase();
+      if (['white', 'black', 'grey', 'gray', 'beige', 'navy', 'cream', 'khaki', 'silver'].includes(name)) return true;
+    }
+    const hsl = this.hexToHsl(hex);
+    if (!hsl) return false;
+    if (hsl.l > 95 || hsl.l < 15 || hsl.s < 15) return true; // white, black, grey
+    if (hsl.h >= 200 && hsl.h <= 260 && hsl.l < 30) return true; // navy
+    if (hsl.h >= 30 && hsl.h <= 60 && hsl.s < 30 && hsl.l > 70) return true; // beige
+    return false;
+  }
+
+  static getColorPairHarmony(item1, item2, reasons) {
+    const hex1 = item1.colorHex || item1.colors?.[0]?.hex;
+    const hex2 = item2.colorHex || item2.colors?.[0]?.hex;
+    const name1 = item1.colorName || item1.colors?.[0]?.name;
+    const name2 = item2.colorName || item2.colors?.[0]?.name;
+
+    if (!hex1 || !hex2) return 50;
+
+    const isNeutral1 = this.isNeutralColor(hex1, name1);
+    const isNeutral2 = this.isNeutralColor(hex2, name2);
+
+    if (isNeutral1 && isNeutral2) {
+      reasons.push("Neutral + Neutral");
+      return 85;
+    }
+    if (isNeutral1 || isNeutral2) {
+      reasons.push("Neutral pairs well with any color");
+      return 85;
+    }
+
+    const hsl1 = this.hexToHsl(hex1);
+    const hsl2 = this.hexToHsl(hex2);
+
+    if (!hsl1 || !hsl2) return 50;
+
+    const hueDiff = Math.min(Math.abs(hsl1.h - hsl2.h), 360 - Math.abs(hsl1.h - hsl2.h));
+
+    if (hueDiff >= 150) {
+      reasons.push("Complementary colors");
+      return 90;
+    }
+    if (hueDiff <= 15) {
+      reasons.push("Same color family");
+      return 60;
+    }
+    if (hueDiff <= 30) {
+      reasons.push("Analogous colors");
+      return 80;
+    }
+    
+    reasons.push("Clashing colors");
+    return 20;
+  }
+
+  static getPatternPairScore(item1, item2, reasons) {
+    const pat1 = (item1.pattern || item1.patterns?.[0] || 'solid').toLowerCase();
+    const pat2 = (item2.pattern || item2.patterns?.[0] || 'solid').toLowerCase();
+
+    const isSolid1 = pat1 === 'solid' || pat1 === 'none';
+    const isSolid2 = pat2 === 'solid' || pat2 === 'none';
+
+    if (isSolid1 && isSolid2) {
+      return 0;
+    }
+
+    if (pat1 === 'graphic print' && pat2 === 'graphic print') {
+      reasons.push("Two graphic prints clash");
+      return -40;
+    }
+
+    if (!isSolid1 && !isSolid2) {
+      reasons.push("Mixing patterns can clash");
+      return -30;
+    }
+
+    if ((isSolid1 && !isSolid2) || (!isSolid1 && isSolid2)) {
+      reasons.push("Solid pairs well with pattern");
+      return 20;
+    }
+
+    return 0;
+  }
+
+  static getSeasonPairScore(item1, item2, reasons) {
+    const s1 = item1.season;
+    const s2 = item2.season;
+    
+    const arr1 = Array.isArray(s1) ? s1 : (s1 ? [s1] : ['all']);
+    const arr2 = Array.isArray(s2) ? s2 : (s2 ? [s2] : ['all']);
+
+    const isAll1 = arr1.includes('all') || arr1.includes('all-season');
+    const isAll2 = arr2.includes('all') || arr2.includes('all-season');
+
+    if (isAll1 || isAll2) {
+      reasons.push("All-season item matches year-round");
+      return 100;
+    }
+
+    const intersection = arr1.filter(s => arr2.includes(s));
+    if (intersection.length > 0) {
+      reasons.push("Matched seasons");
+      return 100;
+    }
+
+    reasons.push("Mismatched seasons");
+    return 10;
+  }
+
+  /**
    * Calculate comprehensive outfit score
    */
   static calculateOutfitScore(outfitItems, season = null, occasion = null) {
@@ -354,24 +501,47 @@ class WardrobeAI {
   /**
    * Find matching items for a given item
    */
-  static findMatchesForItem(item, wardrobeItems, limit = 10) {
+  static findMatchesForItem(item, wardrobeItems, limit = 3) {
     const matches = [];
 
     wardrobeItems.forEach(wardrobeItem => {
       if (wardrobeItem._id.toString() === item._id.toString()) return;
       if (!wardrobeItem.isAvailable) return;
 
-      const score = this.calculateOutfitScore([item, wardrobeItem]);
+      const reasons = [];
+      const colorScore = this.getColorPairHarmony(item, wardrobeItem, reasons);
+      const patternScore = this.getPatternPairScore(item, wardrobeItem, reasons);
+      const seasonScore = this.getSeasonPairScore(item, wardrobeItem, reasons);
+
+      // We weight Color 60% and Season 40% (base 100), then add/subtract the pattern bonus/penalty
+      let finalScore = (colorScore * 0.6) + (seasonScore * 0.4) + patternScore;
+      finalScore = Math.max(0, Math.min(100, Math.round(finalScore)));
+
+      if (reasons.length === 0) {
+        reasons.push("Pieces coordinate well");
+      }
+
+      const colorName = wardrobeItem.colorName || wardrobeItem.colors?.[0]?.name || 'Unknown';
+      const colorHex = wardrobeItem.colorHex || wardrobeItem.colors?.[0]?.hex || '#000000';
+
       matches.push({
+        itemId: wardrobeItem._id,
+        itemName: wardrobeItem.name,
+        itemType: wardrobeItem.category,
+        colorName,
+        colorHex,
+        matchScore: finalScore,
+        matchReasons: reasons,
+        // Keep these for backward compatibility with `generateShoppingCombinations`
         item: wardrobeItem,
-        score: score.overallMatch,
-        breakdown: score
+        score: finalScore,
+        breakdown: { overallMatch: finalScore }
       });
     });
 
     return matches
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, 3);
   }
 
   /**
