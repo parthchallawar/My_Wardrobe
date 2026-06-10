@@ -3,6 +3,7 @@ const Item = require('../models/Item');
 const WardrobeAI = require('../utils/wardrobeAI');
 const { authMiddleware } = require('../middleware/auth');
 const { handleUpload, handleMultipleUpload, deleteImages } = require('../middleware/upload');
+const { detectColors, detectColorsFromMultipleImages } = require('../utils/colorDetection');
 
 const router = express.Router();
 
@@ -69,6 +70,10 @@ router.post('/with-image', authMiddleware, handleUpload, async (req, res) => {
       user: String(req.user.id)
     };
 
+    // Remove manual color input - colors are auto-detected from image
+    delete itemData.color;
+    delete itemData.colors;
+
     // Add image if uploaded (Cloudinary stores it in req.file)
     if (req.file) {
       itemData.images = [{
@@ -80,12 +85,16 @@ router.post('/with-image', authMiddleware, handleUpload, async (req, res) => {
         format: req.file.format,
         bytes: req.file.size
       }];
-    }
 
-    // Process colors from FormData
-    if (itemData.color) {
-      itemData.colors = [{ primary: itemData.color, secondary: itemData.color }];
-      delete itemData.color;
+      // Auto-detect colors from uploaded image
+      try {
+        const detectedColors = await detectColors(req.file.path, 5);
+        itemData.colors = detectedColors;
+      } catch (colorError) {
+        console.error('Color detection error:', colorError.message);
+        // Continue without colors if detection fails
+        itemData.colors = [];
+      }
     }
 
     // Process season from FormData
@@ -98,10 +107,10 @@ router.post('/with-image', authMiddleware, handleUpload, async (req, res) => {
       itemData.tags = itemData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     }
 
-    // Calculate AI features
-    if (itemData.colors && itemData.colors[0]) {
-      const color = WardrobeAI.normalizeColor(itemData.colors[0].primary);
-      const colorInfo = WardrobeAI.colorWheel[color];
+    // Calculate AI features from detected colors
+    if (itemData.colors && itemData.colors.length > 0) {
+      const primaryColor = itemData.colors[0];
+      const colorInfo = WardrobeAI.getColorInfoFromHex(primaryColor.hex);
 
       if (colorInfo) {
         itemData.aiFeatures = {
@@ -154,6 +163,10 @@ router.post('/with-images', authMiddleware, handleMultipleUpload, async (req, re
       user: String(req.user.id)
     };
 
+    // Remove manual color input - colors are auto-detected from images
+    delete itemData.color;
+    delete itemData.colors;
+
     // Add images if uploaded (Cloudinary stores them in req.files)
     if (req.files && req.files.length > 0) {
       itemData.images = req.files.map((file, index) => ({
@@ -165,12 +178,17 @@ router.post('/with-images', authMiddleware, handleMultipleUpload, async (req, re
         format: file.format,
         bytes: file.size
       }));
-    }
 
-    // Process colors from FormData
-    if (itemData.color) {
-      itemData.colors = [{ primary: itemData.color, secondary: itemData.color }];
-      delete itemData.color;
+      // Auto-detect colors from uploaded images
+      try {
+        const imageUrls = req.files.map(file => file.path);
+        const detectedColors = await detectColorsFromMultipleImages(imageUrls, 5);
+        itemData.colors = detectedColors;
+      } catch (colorError) {
+        console.error('Color detection error:', colorError.message);
+        // Continue without colors if detection fails
+        itemData.colors = [];
+      }
     }
 
     // Process season from FormData
@@ -183,10 +201,10 @@ router.post('/with-images', authMiddleware, handleMultipleUpload, async (req, re
       itemData.tags = itemData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     }
 
-    // Calculate AI features
-    if (itemData.colors && itemData.colors[0]) {
-      const color = WardrobeAI.normalizeColor(itemData.colors[0].primary);
-      const colorInfo = WardrobeAI.colorWheel[color];
+    // Calculate AI features from detected colors
+    if (itemData.colors && itemData.colors.length > 0) {
+      const primaryColor = itemData.colors[0];
+      const colorInfo = WardrobeAI.getColorInfoFromHex(primaryColor.hex);
 
       if (colorInfo) {
         itemData.aiFeatures = {
@@ -299,6 +317,10 @@ router.put('/:id/with-image', authMiddleware, handleUpload, async (req, res) => 
 
     const updateData = { ...req.body };
 
+    // Remove manual color input - colors are auto-detected from image
+    delete updateData.color;
+    delete updateData.colors;
+
     // Update image if uploaded
     if (req.file) {
       // Delete old images from Cloudinary
@@ -323,12 +345,16 @@ router.put('/:id/with-image', authMiddleware, handleUpload, async (req, res) => 
         format: req.file.format,
         bytes: req.file.size
       }];
-    }
 
-    // Process colors from FormData
-    if (updateData.color) {
-      updateData.colors = [{ primary: updateData.color, secondary: updateData.color }];
-      delete updateData.color;
+      // Auto-detect colors from uploaded image
+      try {
+        const detectedColors = await detectColors(req.file.path, 5);
+        updateData.colors = detectedColors;
+      } catch (colorError) {
+        console.error('Color detection error:', colorError.message);
+        // Continue without colors if detection fails
+        updateData.colors = [];
+      }
     }
 
     // Process season from FormData
@@ -367,6 +393,10 @@ router.put('/:id/with-images', authMiddleware, handleMultipleUpload, async (req,
 
     const updateData = { ...req.body };
 
+    // Remove manual color input - colors are auto-detected from images
+    delete updateData.color;
+    delete updateData.colors;
+
     // Update images if uploaded
     if (req.files && req.files.length > 0) {
       // Delete old images from Cloudinary
@@ -391,12 +421,17 @@ router.put('/:id/with-images', authMiddleware, handleMultipleUpload, async (req,
         format: file.format,
         bytes: file.size
       }));
-    }
 
-    // Process colors from FormData
-    if (updateData.color) {
-      updateData.colors = [{ primary: updateData.color, secondary: updateData.color }];
-      delete updateData.color;
+      // Auto-detect colors from uploaded images
+      try {
+        const imageUrls = req.files.map(file => file.path);
+        const detectedColors = await detectColorsFromMultipleImages(imageUrls, 5);
+        updateData.colors = detectedColors;
+      } catch (colorError) {
+        console.error('Color detection error:', colorError.message);
+        // Continue without colors if detection fails
+        updateData.colors = [];
+      }
     }
 
     // Process season from FormData
@@ -429,11 +464,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const updateData = { ...req.body };
 
-    // Process colors if sent as color field
-    if (updateData.color) {
-      updateData.colors = [{ primary: updateData.color, secondary: updateData.color }];
-      delete updateData.color;
-    }
+    // Colors are auto-detected from images - remove any manual color input
+    delete updateData.color;
+    delete updateData.colors;
 
     // Process season if sent as string
     if (updateData.season && typeof updateData.season === 'string') {
