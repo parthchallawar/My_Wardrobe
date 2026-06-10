@@ -35,9 +35,21 @@ const itemSchema = new mongoose.Schema({
     default: null
   },
   colors: [{
-    primary: { type: String, required: true },
-    secondary: { type: String, default: null },
-    tertiary: { type: String, default: null }
+    hex: {
+      type: String,
+      required: true,
+      description: 'HEX color code (e.g., #FF5733)'
+    },
+    rgb: {
+      r: { type: Number, required: true },
+      g: { type: Number, required: true },
+      b: { type: Number, required: true }
+    },
+    percentage: {
+      type: Number,
+      default: null,
+      description: 'Dominance percentage of this color in the image'
+    }
   }],
   style: {
     type: String,

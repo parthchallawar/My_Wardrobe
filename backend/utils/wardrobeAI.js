@@ -129,6 +129,96 @@ class WardrobeAI {
   }
 
   /**
+   * Convert HEX color to RGB
+   * @param {string} hex - HEX color code (e.g., #FF5733)
+   * @returns {{r: number, g: number, b: number} | null}
+   */
+  static hexToRgb(hex) {
+    if (!hex) return null;
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
+  }
+
+  /**
+   * Calculate distance between two RGB colors
+   * @param {{r: number, g: number, b: number}} rgb1
+   * @param {{r: number, g: number, b: number}} rgb2
+   * @returns {number}
+   */
+  static colorDistance(rgb1, rgb2) {
+    return Math.sqrt(
+      Math.pow(rgb1.r - rgb2.r, 2) +
+      Math.pow(rgb1.g - rgb2.g, 2) +
+      Math.pow(rgb1.b - rgb2.b, 2)
+    );
+  }
+
+  /**
+   * Get color information from HEX code
+   * Maps HEX to nearest named color in the color wheel
+   * @param {string} hex - HEX color code (e.g., #FF5733)
+   * @returns {{name: string, temperature: string, complementary?: string, analogous?: string[]} | null}
+   */
+  static getColorInfoFromHex(hex) {
+    if (!hex) return null;
+
+    const rgb = this.hexToRgb(hex);
+    if (!rgb) return null;
+
+    // Named colors with their RGB values for matching
+    const namedColors = {
+      red: { r: 255, g: 0, b: 0 },
+      orange: { r: 255, g: 165, b: 0 },
+      yellow: { r: 255, g: 255, b: 0 },
+      green: { r: 0, g: 128, b: 0 },
+      blue: { r: 0, g: 0, b: 255 },
+      purple: { r: 128, g: 0, b: 128 },
+      pink: { r: 255, g: 192, b: 203 },
+      brown: { r: 139, g: 69, b: 19 },
+      black: { r: 0, g: 0, b: 0 },
+      white: { r: 255, g: 255, b: 255 },
+      gray: { r: 128, g: 128, b: 128 },
+      navy: { r: 0, g: 0, b: 128 },
+      beige: { r: 245, g: 245, b: 220 },
+      cream: { r: 255, g: 253, b: 208 },
+      khaki: { r: 189, g: 183, b: 107 },
+      olive: { r: 128, g: 128, b: 0 },
+      burgundy: { r: 128, g: 0, b: 32 },
+      emerald: { r: 80, g: 200, b: 120 },
+      teal: { r: 0, g: 128, b: 128 },
+      gold: { r: 255, g: 215, b: 0 },
+      silver: { r: 192, g: 192, b: 192 }
+    };
+
+    // Find the closest named color
+    let closestColor = 'gray';
+    let minDistance = Infinity;
+
+    for (const [name, colorRgb] of Object.entries(namedColors)) {
+      const distance = this.colorDistance(rgb, colorRgb);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestColor = name;
+      }
+    }
+
+    // Get color wheel info for the closest match
+    const colorWheelInfo = this.colorWheel[closestColor];
+
+    return {
+      name: closestColor,
+      temperature: colorWheelInfo?.temperature || 'neutral',
+      complementary: colorWheelInfo?.complementary || null,
+      analogous: colorWheelInfo?.analogous || null,
+      universal: colorWheelInfo?.universal || false
+    };
+  }
+
+  /**
    * Calculate style consistency score for an outfit
    */
   static calculateStyleConsistency(styles) {
@@ -208,9 +298,15 @@ class WardrobeAI {
    * Calculate comprehensive outfit score
    */
   static calculateOutfitScore(outfitItems, season = null, occasion = null) {
-    const colors = outfitItems.flatMap(item =>
-      item.colors ? [item.colors[0]?.primary] : []
-    ).filter(Boolean);
+    // Extract primary colors from each item (new format: { hex, rgb, percentage })
+    const colors = outfitItems.flatMap(item => {
+      if (!item.colors || item.colors.length === 0) return [];
+      // Get the first (most dominant) color's hex and convert to color name
+      const primaryHex = item.colors[0]?.hex;
+      if (!primaryHex) return [];
+      const colorInfo = this.getColorInfoFromHex(primaryHex);
+      return colorInfo ? [colorInfo.name] : [];
+    });
 
     const styles = outfitItems.map(item => item.style).filter(Boolean);
     const patterns = outfitItems.flatMap(item =>
@@ -250,7 +346,7 @@ class WardrobeAI {
       colorHarmony: Math.round(colorHarmony),
       styleConsistency: Math.round(styleConsistency),
       patternCompatibility,
-      seasonality: Math.round(seasonScore),
+      seasonality: Math.round(seasonalScore),
       versatility: Math.round(versatilityScore)
     };
   }
@@ -284,10 +380,14 @@ class WardrobeAI {
   static generateShoppingCombinations(newItem, wardrobeItems, userPreferences = {}) {
     const { preferredColors = [], avoidColors = [], stylePreferences = [] } = userPreferences;
 
-    // Filter out avoided colors
+    // Filter out avoided colors - use new color format (hex)
     const filteredWardrobe = wardrobeItems.filter(item => {
-      const itemColors = item.colors?.map(c => c.primary) || [];
-      const hasAvoidedColor = itemColors.some(color =>
+      if (!item.colors || item.colors.length === 0) return true;
+      const itemColorNames = item.colors.map(c => {
+        const info = this.getColorInfoFromHex(c.hex);
+        return info?.name;
+      }).filter(Boolean);
+      const hasAvoidedColor = itemColorNames.some(color =>
         avoidColors.includes(color.toLowerCase())
       );
       return !hasAvoidedColor;
@@ -316,10 +416,13 @@ class WardrobeAI {
         const baseItems = [newItem, match.item];
         const scores = this.calculateOutfitScore(baseItems);
 
-        // Bonus for preferred colors
-        const colorBonus = preferredColors.some(prefColor =>
-          match.item.colors?.some(c => c.primary === prefColor?.toLowerCase())
-        ) ? 10 : 0;
+        // Bonus for preferred colors - check HEX values
+        const colorBonus = preferredColors.some(prefColor => {
+          return match.item.colors?.some(c => {
+            const info = this.getColorInfoFromHex(c.hex);
+            return info?.name === prefColor?.toLowerCase();
+          });
+        }) ? 10 : 0;
 
         // Bonus for preferred style
         const styleBonus = stylePreferences.includes(match.item.style) ? 5 : 0;
@@ -347,16 +450,22 @@ class WardrobeAI {
   static explainMatch(item1, item2, scores) {
     const reasons = [];
 
-    // Color harmony explanation
-    const color1 = item1.colors?.[0]?.primary;
-    const color2 = item2.colors?.[0]?.primary;
+    // Color harmony explanation - extract color names from HEX
+    const hex1 = item1.colors?.[0]?.hex;
+    const hex2 = item2.colors?.[0]?.hex;
+    const colorInfo1 = hex1 ? this.getColorInfoFromHex(hex1) : null;
+    const colorInfo2 = hex2 ? this.getColorInfoFromHex(hex2) : null;
+    const color1 = colorInfo1?.name;
+    const color2 = colorInfo2?.name;
 
-    if (this.colorWheel[color1]?.complementary === color2) {
-      reasons.push('Complementary colors create bold, striking combinations');
-    } else if (this.colorWheel[color1]?.analogous?.includes(color2)) {
-      reasons.push('Analogous colors provide a harmonious, coordinated look');
-    } else if (this.fashionRules.neutrals.includes(color1) || this.fashionRules.neutrals.includes(color2)) {
-      reasons.push('Neutral piece lets colors shine while staying balanced');
+    if (color1 && color2) {
+      if (this.colorWheel[color1]?.complementary === color2) {
+        reasons.push('Complementary colors create bold, striking combinations');
+      } else if (this.colorWheel[color1]?.analogous?.includes(color2)) {
+        reasons.push('Analogous colors provide a harmonious, coordinated look');
+      } else if (this.fashionRules.neutrals.includes(color1) || this.fashionRules.neutrals.includes(color2)) {
+        reasons.push('Neutral piece lets colors shine while staying balanced');
+      }
     }
 
     // Style explanation
