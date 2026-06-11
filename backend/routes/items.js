@@ -1,7 +1,7 @@
 const express = require('express');
 const Item = require('../models/Item');
 const WardrobeAI = require('../utils/wardrobeAI');
-const { authMiddleware } = require('../middleware/auth');
+const authMiddleware = require('../middleware/auth');
 const { handleUpload, handleMultipleUpload, deleteImages } = require('../middleware/upload');
 const { detectColors, detectColorsFromMultipleImages } = require('../utils/colorDetection');
 
@@ -126,6 +126,28 @@ router.post('/with-image', authMiddleware, handleUpload, async (req, res) => {
       }
     }
 
+    // Merge massive aiData object if present from AI extraction
+    if (itemData.aiData) {
+      try {
+        const aiDataObj = typeof itemData.aiData === 'string' ? JSON.parse(itemData.aiData) : itemData.aiData;
+        
+        itemData.identity = aiDataObj.identity;
+        itemData.colorAnalysis = aiDataObj.color;
+        itemData.patternAnalysis = aiDataObj.pattern;
+        itemData.fit = aiDataObj.fit;
+        itemData.construction = aiDataObj.construction;
+        itemData.dimensions = aiDataObj.dimensions;
+        itemData.styling = aiDataObj.styling;
+        itemData.matching = aiDataObj.matching;
+        itemData.condition = aiDataObj.condition;
+        itemData.confidence = aiDataObj.confidence;
+        
+        delete itemData.aiData;
+      } catch (e) {
+        console.error('Failed to parse aiData:', e);
+      }
+    }
+
     const item = new Item(itemData);
     await item.save();
 
@@ -217,6 +239,28 @@ router.post('/with-images', authMiddleware, handleMultipleUpload, async (req, re
           trendingScore: 70,
           versatilityScore: 75
         };
+      }
+    }
+
+    // Merge massive aiData object if present from AI extraction
+    if (itemData.aiData) {
+      try {
+        const aiDataObj = typeof itemData.aiData === 'string' ? JSON.parse(itemData.aiData) : itemData.aiData;
+        
+        itemData.identity = aiDataObj.identity;
+        itemData.colorAnalysis = aiDataObj.color;
+        itemData.patternAnalysis = aiDataObj.pattern;
+        itemData.fit = aiDataObj.fit;
+        itemData.construction = aiDataObj.construction;
+        itemData.dimensions = aiDataObj.dimensions;
+        itemData.styling = aiDataObj.styling;
+        itemData.matching = aiDataObj.matching;
+        itemData.condition = aiDataObj.condition;
+        itemData.confidence = aiDataObj.confidence;
+        
+        delete itemData.aiData;
+      } catch (e) {
+        console.error('Failed to parse aiData:', e);
       }
     }
 

@@ -2,7 +2,7 @@ const express = require('express');
 const Item = require('../models/Item');
 const User = require('../models/User');
 const WardrobeAI = require('../utils/wardrobeAI');
-const { authMiddleware } = require('../middleware/auth');
+const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 

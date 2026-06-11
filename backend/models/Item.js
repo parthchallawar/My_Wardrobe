@@ -64,84 +64,117 @@ const itemSchema = new mongoose.Schema({
     enum: ['cotton', 'polyester', 'denim', 'wool', 'silk', 'linen', 'leather', 'synthetic', 'blend']
   },
   
-  // --- New AI-Analyzed Fields ---
+  // --- Comprehensive AI Extraction Fields ---
   imageUrl: { type: String },
   imageBase64: { type: String },
   aiAnalyzed: { type: Boolean, default: false },
-  colorHex: { type: String },
-  colorName: { type: String },
-  pattern: {
-    type: String,
-    enum: ["solid", "striped", "checkered", "floral", "graphic print", "camouflage", "abstract", "polka dots"],
-    default: "solid"
+  
+  identity: {
+    type: { type: String },
+    category: { type: String },
+    subCategory: { type: String },
+    gender_lean: { type: String }
   },
-  // ------------------------------
-
-  brand: { type: String, default: null },
-  size: { type: String, default: null },
-  season: [{
-    type: String,
-    enum: ['spring', 'summer', 'fall', 'winter', 'all-season', 'spring/autumn', 'all']
-  }],
-  occasion: [{
-    type: String,
-    enum: ['everyday', 'work', 'party', 'formal', 'casual', 'sport', 'date', 'travel']
-  }],
-  price: {
-    amount: { type: Number, default: 0 },
-    currency: { type: String, default: 'USD' }
+  
+  colorAnalysis: {
+    primary: {
+      name: String,
+      family: String,
+      hex: String,
+      undertone: String,
+      finish: String,
+      brightness: String
+    },
+    secondary: {
+      name: String,
+      family: String,
+      hex: String,
+      coverage_percent: Number
+    },
+    tertiary: { type: Object, default: null },
+    isMulticolor: Boolean,
+    colorTemperature: String,
+    dominantFamily: String,
+    neutralCompatible: Boolean
   },
-  purchaseDate: { type: Date, default: null },
-  // Cloudinary images - stores array of image objects
-  images: [{
-    url: {
-      type: String,
-      required: true,
-      description: 'Cloudinary URL of the image'
+  
+  patternAnalysis: {
+    type: { type: String },
+    scale: String,
+    direction: String,
+    density: String,
+    isPatternBusy: Boolean,
+    patternContrast: String
+  },
+  
+  fit: {
+    silhouette: String,
+    fit_type: String,
+    waist_definition: String,
+    taper: String,
+    bodyHug: String
+  },
+  
+  construction: {
+    fabric: String,
+    fabricWeight: String,
+    stretch: String,
+    transparency: String,
+    texture: String,
+    lining: Boolean,
+    sheen: String
+  },
+  
+  dimensions: {
+    length: String,
+    sleeve: String,
+    neckline: String,
+    hemType: String,
+    cuffs: String
+  },
+  
+  styling: {
+    style: String,
+    formalityScore: Number,
+    aesthetic: [String],
+    trend: [String],
+    occasion: [String],
+    season: [String],
+    layerable: Boolean,
+    layerPosition: String
+  },
+  
+  matching: {
+    matchTags: [String],
+    pairsWellWith: {
+      bottoms: [String],
+      outerwear: [String],
+      footwear: [String],
+      avoid: [String]
     },
-    publicId: {
-      type: String,
-      required: true,
-      description: 'Cloudinary public ID for deletion'
+    colorHarmony: {
+      complementary: [String],
+      clashes: [String],
+      neutral_safe: Boolean
     },
-    isPrimary: {
-      type: Boolean,
-      default: false,
-      description: 'Mark as primary image'
-    },
-    width: {
-      type: Number,
-      default: null
-    },
-    height: {
-      type: Number,
-      default: null
-    },
-    format: {
-      type: String,
-      default: null
-    },
-    bytes: {
-      type: Number,
-      default: null
-    }
-  }],
-  tags: [String],
-  wearCount: { type: Number, default: 0 },
-  lastWorn: { type: Date, default: null },
-  isFavorite: { type: Boolean, default: false },
-  isAvailable: { type: Boolean, default: true },
-  notes: { type: String, default: null },
-  aiFeatures: {
-    colorAnalysis: {
-      warm: { type: Number, default: 0 },
-      cool: { type: Number, default: 0 },
-      neutral: { type: Number, default: 0 }
-    },
-    compatibilityScore: { type: Number, default: 80 },
-    trendingScore: { type: Number, default: 70 },
-    versatilityScore: { type: Number, default: 75 }
+    versatilityScore: Number,
+    outfitRole: String
+  },
+  
+  condition: {
+    estimatedWear: String,
+    careSymbols: [String]
+  },
+  
+  confidence: {
+    overall: Number,
+    color: Number,
+    fabric: Number,
+    fit: Number,
+    pattern: Number,
+    needsUserReview: [String]
   }
+  // ------------------------------------------
 }, {
   timestamps: true
 });

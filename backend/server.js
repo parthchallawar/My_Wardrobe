@@ -22,6 +22,21 @@ const { rateLimiter } = require('./middleware/rateLimiter');
 // Initialize Express app
 const app = express();
 
+// Custom Request Logging Middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  console.log(`\n[${new Date().toISOString()}] ➡️  ${req.method} ${req.url}`);
+  
+  // Intercept response finish to log status
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const statusColor = res.statusCode >= 400 ? '\x1b[31m' : '\x1b[32m'; // Red for errors, green for success
+    const resetColor = '\x1b[0m';
+    console.log(`[${new Date().toISOString()}] ⬅️  ${req.method} ${req.url} ${statusColor}${res.statusCode}${resetColor} - ${duration}ms`);
+  });
+  next();
+});
+
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',

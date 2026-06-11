@@ -12,17 +12,46 @@ async function analyzeClothingImage(imageBuffer) {
     const base64Image = imageBuffer.toString('base64');
     const imageUrl = `data:image/jpeg;base64,${base64Image}`;
 
-    const prompt = `You are an expert AI wardrobe assistant. Analyze the provided image of a clothing item. Output ONLY a valid JSON object with the following exact keys and values from the allowed sets, and NO other text or markdown formatting:
+    const prompt = `You are an expert AI wardrobe assistant. Analyze the provided image of a clothing item. Output ONLY a valid JSON object matching the exact structure below, filling in the values based on your analysis of the image. Do NOT output any markdown formatting or extra text.
+
 {
-  "type": (choose one of: "t-shirt", "shirt", "sweater", "jacket", "vest", "pants", "shorts", "skirt", "coat", "dress", "jumpsuit", "shoes", "bag", "hat", "scarf", "belt", "unknown"),
-  "style": (choose one of: "casual", "formal", "streetwear", "sportswear", "ethnic", "party", "workwear", "loungewear"),
-  "pattern": (choose one of: "solid", "striped", "checkered", "floral", "graphic print", "camouflage", "abstract", "polka dots"),
-  "season": (choose one of: "summer", "winter", "spring/autumn", "all")
+  "identity": { "type": "string", "category": "string", "subCategory": "string", "gender_lean": "string" },
+  "color": {
+    "primary": { "name": "string", "family": "string", "hex": "string", "undertone": "string", "finish": "string", "brightness": "string" },
+    "secondary": { "name": "string", "family": "string", "hex": "string", "coverage_percent": "number" },
+    "tertiary": null,
+    "isMulticolor": "boolean",
+    "colorTemperature": "string",
+    "dominantFamily": "string",
+    "neutralCompatible": "boolean"
+  },
+  "pattern": { "type": "string", "scale": "string", "direction": "string", "density": "string", "isPatternBusy": "boolean", "patternContrast": "string" },
+  "fit": { "silhouette": "string", "fit_type": "string", "waist_definition": "string", "taper": "string", "bodyHug": "string" },
+  "construction": { "fabric": "string", "fabricWeight": "string", "stretch": "string", "transparency": "string", "texture": "string", "lining": "boolean", "sheen": "string" },
+  "dimensions": { "length": "string", "sleeve": "string", "neckline": "string", "hemType": "string", "cuffs": "string" },
+  "styling": { "style": "string", "formalityScore": "number", "aesthetic": ["string"], "trend": ["string"], "occasion": ["string"], "season": ["string"], "layerable": "boolean", "layerPosition": "string" },
+  "matching": {
+    "matchTags": ["string"],
+    "pairsWellWith": { "bottoms": ["string"], "outerwear": ["string"], "footwear": ["string"], "avoid": ["string"] },
+    "colorHarmony": { "complementary": ["string"], "clashes": ["string"], "neutral_safe": "boolean" },
+    "versatilityScore": "number",
+    "outfitRole": "string"
+  },
+  "condition": { "estimatedWear": "string", "careSymbols": ["string"] },
+  "confidence": { "overall": "number", "color": "number", "fabric": "number", "fit": "number", "pattern": "number", "needsUserReview": ["string"] }
 }`;
 
+    console.log(`[AI Analysis] 📤 Sending image to NVIDIA NIM Vision API...`);
+    console.log(`[AI Analysis] Model: meta/llama-3.2-90b-vision-instruct`);
+    const startTime = Date.now();
+
     const response = await openai.chat.completions.create({
-      model: "meta/llama-3.2-11b-vision-instruct",
+      model: "meta/llama-3.2-90b-vision-instruct",
       messages: [
+        {
+          role: "system",
+          content: "You are an expert AI wardrobe assistant. You MUST output ONLY a valid JSON object. No conversational text, no preambles, no markdown blocks. NEVER output anything other than JSON. If you cannot identify the clothing or there is an issue, still output the JSON structure with fallback/empty values."
+        },
         {
           role: "user",
           content: [
@@ -36,34 +65,37 @@ async function analyzeClothingImage(imageBuffer) {
           ]
         }
       ],
-      max_tokens: 1024,
+      max_tokens: 2048,
       temperature: 0.1, // Low temperature for consistent JSON output
       stream: false
     });
 
+    const duration = Date.now() - startTime;
+    console.log(`[AI Analysis] 📥 Received response from NVIDIA NIM in ${duration}ms`);
+
     let resultText = response.choices[0].message.content.trim();
+    console.log(`[AI Analysis] Raw Response:`, resultText);
     
-    // Clean up potential markdown formatting (e.g., ```json ... ```)
-    if (resultText.startsWith('```json')) {
-      resultText = resultText.replace(/^```json/, '').replace(/```$/, '').trim();
-    } else if (resultText.startsWith('```')) {
-      resultText = resultText.replace(/^```/, '').replace(/```$/, '').trim();
+    // Clean up potential markdown formatting (e.g., \`\`\`json ... \`\`\`)
+    if (resultText.startsWith('\`\`\`json')) {
+      resultText = resultText.replace(/^\`\`\`json/, '').replace(/\`\`\`$/, '').trim();
+    } else if (resultText.startsWith('\`\`\`')) {
+      resultText = resultText.replace(/^\`\`\`/, '').replace(/\`\`\`$/, '').trim();
     }
 
     const data = JSON.parse(resultText);
+    console.log(`[AI Analysis] ✅ Successfully parsed deep JSON data.`);
     
-    // Ensure all keys exist with fallback defaults
-    return {
-      type: data.type || 'unknown',
-      style: data.style || 'casual',
-      pattern: data.pattern || 'solid',
-      season: data.season || 'all'
-    };
+    // Return the full object
+    return data;
 
   } catch (error) {
-    console.error('Error in analyzeClothingImage (NVIDIA NIM):', error.message);
+    console.error(`[AI Analysis] ❌ Error during image analysis:`, error.message);
+    if (error.response) {
+      console.error(`[AI Analysis] API Response Error:`, error.response.data);
+    }
     // Fallback on error
-    return { type: 'unknown', style: 'casual', pattern: 'solid', season: 'all' };
+    return { error: 'Failed to analyze image' };
   }
 }
 
