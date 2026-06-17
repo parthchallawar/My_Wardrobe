@@ -140,9 +140,12 @@ router.post('/analyze-outfits', authMiddleware, async (req, res) => {
     const scores = WardrobeAI.calculateOutfitScore(wardrobeItems);
 
     // Get detailed analysis
-    const colors = wardrobeItems.flatMap(item =>
-      item.colors ? [item.colors[0]?.primary] : []
-    ).filter(Boolean);
+    const colors = wardrobeItems.flatMap(item => {
+      // Prefer colorAnalysis.primary.name (new AI format), fallback to colors[0].hex (legacy)
+      if (item.colorAnalysis?.primary?.name) return [item.colorAnalysis.primary.name];
+      if (item.colors?.[0]?.hex) return [WardrobeAI.getColorNameFromHex(item.colors[0].hex) || item.colors[0].hex];
+      return [];
+    }).filter(Boolean);
 
     const styles = wardrobeItems.map(item => item.style).filter(Boolean);
     const patterns = wardrobeItems.flatMap(item =>
@@ -201,7 +204,13 @@ router.get('/style-insights', authMiddleware, async (req, res) => {
     // Color distribution
     const colorStats = {};
     wardrobeItems.forEach(item => {
-      const primaryColor = item.colors?.[0]?.primary;
+      // Prefer colorAnalysis.primary.name (new AI format), fallback to legacy hex-based extraction
+      let primaryColor;
+      if (item.colorAnalysis?.primary?.name) {
+        primaryColor = item.colorAnalysis.primary.name;
+      } else if (item.colors?.[0]?.hex) {
+        primaryColor = WardrobeAI.getColorNameFromHex(item.colors[0].hex) || item.colors[0].hex;
+      }
       if (primaryColor) {
         colorStats[primaryColor] = (colorStats[primaryColor] || 0) + 1;
       }
@@ -333,9 +342,11 @@ router.post('/recommend-purchases', authMiddleware, async (req, res) => {
 
     // Color recommendations based on current wardrobe
     const existingColors = [...new Set(
-      wardrobeItems.flatMap(item =>
-        item.colors ? item.colors[0]?.primary : []
-      ).filter(Boolean)
+      wardrobeItems.flatMap(item => {
+        if (item.colorAnalysis?.primary?.name) return [item.colorAnalysis.primary.name];
+        if (item.colors?.[0]?.hex) return [WardrobeAI.getColorNameFromHex(item.colors[0].hex) || item.colors[0].hex];
+        return [];
+      }).filter(Boolean)
     )];
 
     const recommendedColors = ['black', 'white', 'navy', 'gray', 'beige']
@@ -357,7 +368,7 @@ router.post('/recommend-purchases', authMiddleware, async (req, res) => {
  * @desc    Get available colors and color theory information
  * @access  Private
  */
-router.get('/colors', async (req, res) => {
+router.get('/colors', authMiddleware, async (req, res) => {
   try {
     const colors = Object.keys(WardrobeAI.colorWheel).map(color => ({
       name: color,
@@ -383,7 +394,7 @@ router.get('/colors', async (req, res) => {
  * @desc    Get seasonal styling guide
  * @access  Private
  */
-router.get('/seasonal-guide', async (req, res) => {
+router.get('/seasonal-guide', authMiddleware, async (req, res) => {
   try {
     const seasonalTips = {
       spring: {

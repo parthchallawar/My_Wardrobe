@@ -13,25 +13,10 @@ const itemSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: true,
-    enum: ['tops', 'bottoms', 'shoes', 'accessories', 'outerwear', 'dresses']
+    required: true
   },
   subCategory: {
     type: String,
-    enum: [
-      // Tops
-      't-shirt', 'shirt', 'blouse', 'sweater', 'hoodie', 'jacket', 'polo', 'tank-top',
-      // Bottoms
-      'jeans', 'trousers', 'shorts', 'skirt', 'leggings', 'chinos',
-      // Shoes
-      'sneakers', 'boots', 'sandals', 'heels', 'flats', 'loafers',
-      // Accessories
-      'belt', 'hat', 'scarf', 'jewelry', 'bag', 'watch', 'sunglasses', 'tie',
-      // Outerwear
-      'coat', 'blazer', 'denim-jacket', 'cardigan',
-      // Dresses
-      'casual', 'formal', 'cocktail', 'summer', 'winter', 'maxi', 'midi', 'mini'
-    ],
     default: null
   },
   colors: [{
@@ -53,30 +38,50 @@ const itemSchema = new mongoose.Schema({
   }],
   style: {
     type: String,
-    enum: ['casual', 'formal', 'sporty', 'bohemian', 'minimalist', 'vintage', 'streetwear', 'glam']
+    default: null
   },
   patterns: [{
-    type: String,
-    enum: ['solid', 'striped', 'plaid', 'floral', 'geometric', 'animal-print', 'polka-dot', 'checkered', 'none']
+    type: String
   }],
   fabric: {
     type: String,
-    enum: ['cotton', 'polyester', 'denim', 'wool', 'silk', 'linen', 'leather', 'synthetic', 'blend']
+    default: null
   },
-  
-  // --- Comprehensive AI Extraction Fields ---
+
+  // --- Image & Status Fields ---
+  images: [{
+    url: { type: String },
+    publicId: { type: String },
+    isPrimary: { type: Boolean, default: false },
+    width: { type: Number },
+    height: { type: Number },
+    format: { type: String },
+    bytes: { type: Number }
+  }],
   imageUrl: { type: String },
   imageBase64: { type: String },
   aiAnalyzed: { type: Boolean, default: false },
-  
+  isAvailable: { type: Boolean, default: true },
+  isFavorite: { type: Boolean, default: false },
+  wearCount: { type: Number, default: 0 },
+  lastWorn: { type: Date, default: null },
+
+  // --- User-facing metadata ---
+  brand: { type: String, default: null },
+  season: [{ type: String }],
+  occasion: [{ type: String }],
+  tags: [{ type: String }],
+  notes: { type: String, default: null },
+
+  // --- Comprehensive AI Extraction Fields ---
   identity: {
     type: { type: String },
     category: { type: String },
     subCategory: { type: String },
     gender_lean: { type: String }
   },
-  
-  colorAnalysis: {
+
+  color: {
     primary: {
       name: String,
       family: String,
@@ -97,8 +102,8 @@ const itemSchema = new mongoose.Schema({
     dominantFamily: String,
     neutralCompatible: Boolean
   },
-  
-  patternAnalysis: {
+
+  pattern: {
     type: { type: String },
     scale: String,
     direction: String,
@@ -106,7 +111,7 @@ const itemSchema = new mongoose.Schema({
     isPatternBusy: Boolean,
     patternContrast: String
   },
-  
+
   fit: {
     silhouette: String,
     fit_type: String,
@@ -114,7 +119,7 @@ const itemSchema = new mongoose.Schema({
     taper: String,
     bodyHug: String
   },
-  
+
   construction: {
     fabric: String,
     fabricWeight: String,
@@ -124,7 +129,7 @@ const itemSchema = new mongoose.Schema({
     lining: Boolean,
     sheen: String
   },
-  
+
   dimensions: {
     length: String,
     sleeve: String,
@@ -132,7 +137,7 @@ const itemSchema = new mongoose.Schema({
     hemType: String,
     cuffs: String
   },
-  
+
   styling: {
     style: String,
     formalityScore: Number,
@@ -143,7 +148,7 @@ const itemSchema = new mongoose.Schema({
     layerable: Boolean,
     layerPosition: String
   },
-  
+
   matching: {
     matchTags: [String],
     pairsWellWith: {
@@ -160,12 +165,12 @@ const itemSchema = new mongoose.Schema({
     versatilityScore: Number,
     outfitRole: String
   },
-  
+
   condition: {
     estimatedWear: String,
     careSymbols: [String]
   },
-  
+
   confidence: {
     overall: Number,
     color: Number,
@@ -173,17 +178,27 @@ const itemSchema = new mongoose.Schema({
     fit: Number,
     pattern: Number,
     needsUserReview: [String]
+  },
+
+  // --- Legacy AI features (for rule-based engine) ---
+  aiFeatures: {
+    colorAnalysis: {
+      warm: Number,
+      cool: Number,
+      neutral: Number
+    },
+    compatibilityScore: Number,
+    trendingScore: Number,
+    versatilityScore: Number
   }
-  // ------------------------------------------
 }, {
-  timestamps: true
+  timestamps: true,
+  strict: false // Allow AI fields that may not be pre-defined
 });
 
 // Index for faster queries
 itemSchema.index({ user: 1, category: 1 });
-itemSchema.index({ user: 1, colors: 1 });
 itemSchema.index({ user: 1, style: 1 });
 itemSchema.index({ user: 1, 'aiFeatures.compatibilityScore': -1 });
-itemSchema.index({ 'images.publicId': 1 });
 
 module.exports = mongoose.model('Item', itemSchema);

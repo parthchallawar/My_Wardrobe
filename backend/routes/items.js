@@ -1,11 +1,110 @@
 const express = require('express');
 const Item = require('../models/Item');
+const User = require('../models/User');
 const WardrobeAI = require('../utils/wardrobeAI');
 const authMiddleware = require('../middleware/auth');
 const { handleUpload, handleMultipleUpload, deleteImages } = require('../middleware/upload');
 const { detectColors, detectColorsFromMultipleImages } = require('../utils/colorDetection');
 
 const router = express.Router();
+
+/**
+ * Helper: merge aiData into itemData, populating both deep AI fields
+ * and auto-filling top-level category/style/fabric/patterns/season/occasion
+ */
+function mergeAiData(itemData) {
+  if (!itemData.aiData) return;
+
+  try {
+    const aiDataObj = typeof itemData.aiData === 'string' ? JSON.parse(itemData.aiData) : itemData.aiData;
+
+    // Map AI response keys to schema fields
+    itemData.identity = aiDataObj.identity;
+    
+    // Sanitize color to ensure it matches the schema object structure
+    if (aiDataObj.color) {
+      if (typeof aiDataObj.color === 'string') {
+        itemData.color = {
+          primary: {
+            name: aiDataObj.color,
+            hex: '#000000',
+            family: 'neutral'
+          }
+        };
+      } else {
+        itemData.color = aiDataObj.color;
+      }
+    }
+    
+    // Sanitize pattern to ensure it matches the schema object structure (preventing String-to-Object CastError)
+    if (aiDataObj.pattern) {
+      if (typeof aiDataObj.pattern === 'string') {
+        itemData.pattern = {
+          type: aiDataObj.pattern
+        };
+      } else {
+        itemData.pattern = aiDataObj.pattern;
+      }
+    }
+
+    itemData.fit = aiDataObj.fit;
+    itemData.construction = aiDataObj.construction;
+    itemData.dimensions = aiDataObj.dimensions;
+    itemData.styling = aiDataObj.styling;
+    itemData.matching = aiDataObj.matching;
+    itemData.condition = aiDataObj.condition;
+    itemData.confidence = aiDataObj.confidence;
+
+    // Auto-populate top-level fields from AI analysis if not explicitly provided
+    if (aiDataObj.identity?.category && !itemData.category) {
+      itemData.category = aiDataObj.identity.category;
+    }
+    if (aiDataObj.identity?.subCategory && !itemData.subCategory) {
+      itemData.subCategory = aiDataObj.identity.subCategory;
+    }
+    if (aiDataObj.identity?.type && !itemData.name) {
+      // Use AI-detected type as the item name if none provided
+      itemData.name = aiDataObj.identity.type.charAt(0).toUpperCase() + aiDataObj.identity.type.slice(1);
+    }
+    if (aiDataObj.styling?.style && !itemData.style) {
+      itemData.style = aiDataObj.styling.style;
+    }
+    if (aiDataObj.construction?.fabric && !itemData.fabric) {
+      itemData.fabric = aiDataObj.construction.fabric;
+    }
+    if (aiDataObj.pattern?.type) {
+      // Only set patterns from AI if user didn't provide any
+      if (!itemData.patterns || itemData.patterns.length === 0) {
+        itemData.patterns = [aiDataObj.pattern.type];
+      }
+    }
+    if (aiDataObj.styling?.season && aiDataObj.styling.season.length > 0) {
+      // Only set season from AI if user didn't provide any
+      if (!itemData.season || itemData.season.length === 0) {
+        itemData.season = aiDataObj.styling.season;
+      }
+    }
+    if (aiDataObj.styling?.occasion && aiDataObj.styling.occasion.length > 0) {
+      // Only set occasion from AI if user didn't provide any
+      if (!itemData.occasion || itemData.occasion.length === 0) {
+        itemData.occasion = aiDataObj.styling.occasion;
+      }
+    }
+    if (aiDataObj.matching?.matchTags) {
+      // Merge AI match tags into item tags if not already present
+      if (!itemData.tags || itemData.tags.length === 0) {
+        itemData.tags = aiDataObj.matching.matchTags;
+      }
+    }
+
+    // Mark as AI-analyzed
+    itemData.aiAnalyzed = true;
+
+    delete itemData.aiData;
+  } catch (e) {
+    console.error('Failed to parse aiData:', e);
+  }
+}
 
 /**
  * @route   GET /api/items
@@ -59,6 +158,56 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 /**
+ * @route   GET /api/items/statistics/summary
+ * @desc    Get wardrobe statistics summary
+ * @access  Private
+ * NOTE: This route MUST come before /:id to avoid route shadowing
+ */
+router.get('/statistics/summary', authMiddleware, async (req, res) => {
+  try {
+    const stats = await Item.aggregate([
+      { $match: { user: req.user.id } },
+      {
+        $group: {
+          _id: null,
+          totalItems: { $sum: 1 },
+          totalWears: { $sum: '$wearCount' },
+          favorites: { $sum: { $cond: ['$isFavorite', 1, 0] } },
+          categoryBreakdown: {
+            $push: {
+              category: '$category',
+              count: 1
+            }
+          }
+        }
+      }
+    ]);
+
+    const categoryStats = await Item.aggregate([
+      { $match: { user: req.user.id } },
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    res.json({
+      summary: stats[0] || { totalItems: 0, totalWears: 0, favorites: 0 },
+      categoryStats,
+      topCategories: categoryStats.slice(0, 5)
+    });
+  } catch (error) {
+    console.error('Get statistics error:', error);
+    res.status(500).json({ error: 'Server error fetching statistics' });
+  }
+});
+
+/**
  * @route   POST /api/items/with-image
  * @desc    Create a new wardrobe item with single image upload
  * @access  Private
@@ -92,18 +241,17 @@ router.post('/with-image', authMiddleware, handleUpload, async (req, res) => {
         itemData.colors = detectedColors;
       } catch (colorError) {
         console.error('Color detection error:', colorError.message);
-        // Continue without colors if detection fails
         itemData.colors = [];
       }
     }
 
     // Process season from FormData
-    if (itemData.season) {
+    if (itemData.season && typeof itemData.season === 'string') {
       itemData.season = [itemData.season];
     }
 
     // Process tags from FormData
-    if (itemData.tags) {
+    if (itemData.tags && typeof itemData.tags === 'string') {
       itemData.tags = itemData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     }
 
@@ -126,33 +274,13 @@ router.post('/with-image', authMiddleware, handleUpload, async (req, res) => {
       }
     }
 
-    // Merge massive aiData object if present from AI extraction
-    if (itemData.aiData) {
-      try {
-        const aiDataObj = typeof itemData.aiData === 'string' ? JSON.parse(itemData.aiData) : itemData.aiData;
-        
-        itemData.identity = aiDataObj.identity;
-        itemData.colorAnalysis = aiDataObj.color;
-        itemData.patternAnalysis = aiDataObj.pattern;
-        itemData.fit = aiDataObj.fit;
-        itemData.construction = aiDataObj.construction;
-        itemData.dimensions = aiDataObj.dimensions;
-        itemData.styling = aiDataObj.styling;
-        itemData.matching = aiDataObj.matching;
-        itemData.condition = aiDataObj.condition;
-        itemData.confidence = aiDataObj.confidence;
-        
-        delete itemData.aiData;
-      } catch (e) {
-        console.error('Failed to parse aiData:', e);
-      }
-    }
+    // Merge AI data and auto-populate top-level fields
+    mergeAiData(itemData);
 
     const item = new Item(itemData);
     await item.save();
 
     // Update user wardrobe stats
-    const User = require('../models/User');
     await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { 'wardrobeStats.totalItems': 1 } }
@@ -208,18 +336,17 @@ router.post('/with-images', authMiddleware, handleMultipleUpload, async (req, re
         itemData.colors = detectedColors;
       } catch (colorError) {
         console.error('Color detection error:', colorError.message);
-        // Continue without colors if detection fails
         itemData.colors = [];
       }
     }
 
     // Process season from FormData
-    if (itemData.season) {
+    if (itemData.season && typeof itemData.season === 'string') {
       itemData.season = [itemData.season];
     }
 
     // Process tags from FormData
-    if (itemData.tags) {
+    if (itemData.tags && typeof itemData.tags === 'string') {
       itemData.tags = itemData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     }
 
@@ -242,33 +369,13 @@ router.post('/with-images', authMiddleware, handleMultipleUpload, async (req, re
       }
     }
 
-    // Merge massive aiData object if present from AI extraction
-    if (itemData.aiData) {
-      try {
-        const aiDataObj = typeof itemData.aiData === 'string' ? JSON.parse(itemData.aiData) : itemData.aiData;
-        
-        itemData.identity = aiDataObj.identity;
-        itemData.colorAnalysis = aiDataObj.color;
-        itemData.patternAnalysis = aiDataObj.pattern;
-        itemData.fit = aiDataObj.fit;
-        itemData.construction = aiDataObj.construction;
-        itemData.dimensions = aiDataObj.dimensions;
-        itemData.styling = aiDataObj.styling;
-        itemData.matching = aiDataObj.matching;
-        itemData.condition = aiDataObj.condition;
-        itemData.confidence = aiDataObj.confidence;
-        
-        delete itemData.aiData;
-      } catch (e) {
-        console.error('Failed to parse aiData:', e);
-      }
-    }
+    // Merge AI data and auto-populate top-level fields
+    mergeAiData(itemData);
 
     const item = new Item(itemData);
     await item.save();
 
     // Update user wardrobe stats
-    const User = require('../models/User');
     await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { 'wardrobeStats.totalItems': 1 } }
@@ -325,7 +432,6 @@ router.post('/', authMiddleware, async (req, res) => {
     await item.save();
 
     // Update user wardrobe stats
-    const User = require('../models/User');
     await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { 'wardrobeStats.totalItems': 1 } }
@@ -396,18 +502,17 @@ router.put('/:id/with-image', authMiddleware, handleUpload, async (req, res) => 
         updateData.colors = detectedColors;
       } catch (colorError) {
         console.error('Color detection error:', colorError.message);
-        // Continue without colors if detection fails
         updateData.colors = [];
       }
     }
 
     // Process season from FormData
-    if (updateData.season) {
+    if (updateData.season && typeof updateData.season === 'string') {
       updateData.season = [updateData.season];
     }
 
     // Process tags from FormData
-    if (updateData.tags) {
+    if (updateData.tags && typeof updateData.tags === 'string') {
       updateData.tags = updateData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     }
 
@@ -473,18 +578,17 @@ router.put('/:id/with-images', authMiddleware, handleMultipleUpload, async (req,
         updateData.colors = detectedColors;
       } catch (colorError) {
         console.error('Color detection error:', colorError.message);
-        // Continue without colors if detection fails
         updateData.colors = [];
       }
     }
 
     // Process season from FormData
-    if (updateData.season) {
+    if (updateData.season && typeof updateData.season === 'string') {
       updateData.season = [updateData.season];
     }
 
     // Process tags from FormData
-    if (updateData.tags) {
+    if (updateData.tags && typeof updateData.tags === 'string') {
       updateData.tags = updateData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     }
 
@@ -525,7 +629,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const item = await Item.findOneAndUpdate(
       { _id: req.params.id, user: req.user.id },
       updateData,
-      { new: true, runValidators: true }
+      { new: true, runValidators: false }
     );
 
     if (!item) {
@@ -567,7 +671,6 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     await Item.deleteOne({ _id: item._id });
 
     // Update user wardrobe stats
-    const User = require('../models/User');
     await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { 'wardrobeStats.totalItems': -1 } }
@@ -624,55 +727,6 @@ router.post('/:id/wear', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Record wear error:', error);
     res.status(500).json({ error: 'Server error recording wear' });
-  }
-});
-
-/**
- * @route   GET /api/items/statistics/summary
- * @desc    Get wardrobe statistics summary
- * @access  Private
- */
-router.get('/statistics/summary', authMiddleware, async (req, res) => {
-  try {
-    const stats = await Item.aggregate([
-      { $match: { user: req.user.id } },
-      {
-        $group: {
-          _id: null,
-          totalItems: { $sum: 1 },
-          totalWears: { $sum: '$wearCount' },
-          favorites: { $sum: { $cond: ['$isFavorite', 1, 0] } },
-          categoryBreakdown: {
-            $push: {
-              category: '$category',
-              count: 1
-            }
-          }
-        }
-      }
-    ]);
-
-    const categoryStats = await Item.aggregate([
-      { $match: { user: req.user.id } },
-      {
-        $group: {
-          _id: '$category',
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
-    ]);
-
-    res.json({
-      summary: stats[0] || { totalItems: 0, totalWears: 0, favorites: 0 },
-      categoryStats,
-      topCategories: categoryStats.slice(0, 5)
-    });
-  } catch (error) {
-    console.error('Get statistics error:', error);
-    res.status(500).json({ error: 'Server error fetching statistics' });
   }
 });
 

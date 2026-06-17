@@ -4,7 +4,7 @@
  */
 
 class WardrobeAI {
-  // Color harmony rules and relationships
+  // Color harmony rules and relationships - expanded for global clothing coverage
   static colorWheel = {
     red: { complementary: 'green', analogous: ['orange', 'purple'], temperature: 'warm' },
     orange: { complementary: 'blue', analogous: ['red', 'yellow'], temperature: 'warm' },
@@ -26,19 +26,32 @@ class WardrobeAI {
     emerald: { complementary: 'burgundy', analogous: ['green', 'teal'], temperature: 'cool' },
     teal: { complementary: 'orange', analogous: ['blue', 'green'], temperature: 'cool' },
     gold: { complementary: 'purple', analogous: ['orange', 'yellow'], temperature: 'warm' },
-    silver: { complementary: 'navy', analogous: ['gray', 'white'], temperature: 'neutral' }
+    silver: { complementary: 'navy', analogous: ['gray', 'white'], temperature: 'neutral' },
+    // Extended colors for global/traditional clothing
+    violet: { complementary: 'yellow', analogous: ['purple', 'blue'], temperature: 'cool' },
+    indigo: { complementary: 'orange', analogous: ['blue', 'purple'], temperature: 'cool' },
+    maroon: { complementary: 'emerald', analogous: ['burgundy', 'red'], temperature: 'warm' },
+    coral: { complementary: 'teal', analogous: ['orange', 'pink'], temperature: 'warm' },
+    lavender: { complementary: 'gold', analogous: ['purple', 'pink'], temperature: 'cool' },
+    magenta: { complementary: 'green', analogous: ['purple', 'pink'], temperature: 'cool' },
+    turquoise: { complementary: 'burgundy', analogous: ['teal', 'blue'], temperature: 'cool' },
+    rust: { complementary: 'navy', analogous: ['brown', 'orange'], temperature: 'warm' },
+    tan: { complementary: 'navy', analogous: ['beige', 'brown'], temperature: 'neutral' },
+    peach: { complementary: 'navy', analogous: ['coral', 'pink'], temperature: 'warm' },
+    mustard: { complementary: 'purple', analogous: ['yellow', 'gold'], temperature: 'warm' }
   };
 
-  // Style compatibility matrix
+  // Style compatibility matrix - expanded with 'traditional' style
   static styleCompatibility = {
-    casual: { casual: 100, formal: 30, sporty: 70, bohemian: 60, minimalist: 80, vintage: 50, streetwear: 90, glam: 40 },
-    formal: { casual: 30, formal: 100, sporty: 10, bohemian: 20, minimalist: 90, vintage: 40, streetwear: 20, glam: 85 },
-    sporty: { casual: 70, formal: 10, sporty: 100, bohemian: 30, minimalist: 50, vintage: 20, streetwear: 80, glam: 20 },
-    bohemian: { casual: 60, formal: 20, sporty: 30, bohemian: 100, minimalist: 40, vintage: 90, streetwear: 50, glam: 60 },
-    minimalist: { casual: 80, formal: 90, sporty: 50, bohemian: 40, minimalist: 100, vintage: 70, streetwear: 60, glam: 75 },
-    vintage: { casual: 50, formal: 40, sporty: 20, bohemian: 90, minimalist: 70, vintage: 100, streetwear: 40, glam: 65 },
-    streetwear: { casual: 90, formal: 20, sporty: 80, bohemian: 50, minimalist: 60, vintage: 40, streetwear: 100, glam: 30 },
-    glam: { casual: 40, formal: 85, sporty: 20, bohemian: 60, minimalist: 75, vintage: 65, streetwear: 30, glam: 100 }
+    casual: { casual: 100, formal: 30, sporty: 70, bohemian: 60, minimalist: 80, vintage: 50, streetwear: 90, glam: 40, traditional: 25 },
+    formal: { casual: 30, formal: 100, sporty: 10, bohemian: 20, minimalist: 90, vintage: 40, streetwear: 20, glam: 85, traditional: 75 },
+    sporty: { casual: 70, formal: 10, sporty: 100, bohemian: 30, minimalist: 50, vintage: 20, streetwear: 80, glam: 20, traditional: 15 },
+    bohemian: { casual: 60, formal: 20, sporty: 30, bohemian: 100, minimalist: 40, vintage: 90, streetwear: 50, glam: 60, traditional: 55 },
+    minimalist: { casual: 80, formal: 90, sporty: 50, bohemian: 40, minimalist: 100, vintage: 70, streetwear: 60, glam: 75, traditional: 50 },
+    vintage: { casual: 50, formal: 40, sporty: 20, bohemian: 90, minimalist: 70, vintage: 100, streetwear: 40, glam: 65, traditional: 80 },
+    streetwear: { casual: 90, formal: 20, sporty: 80, bohemian: 50, minimalist: 60, vintage: 40, streetwear: 100, glam: 30, traditional: 15 },
+    glam: { casual: 40, formal: 85, sporty: 20, bohemian: 60, minimalist: 75, vintage: 65, streetwear: 30, glam: 100, traditional: 70 },
+    traditional: { casual: 25, formal: 75, sporty: 15, bohemian: 55, minimalist: 50, vintage: 80, streetwear: 15, glam: 70, traditional: 100 }
   };
 
   // Fashion rules for outfit combinations
@@ -169,7 +182,7 @@ class WardrobeAI {
     const rgb = this.hexToRgb(hex);
     if (!rgb) return null;
 
-    // Named colors with their RGB values for matching
+    // Named colors with their RGB values for matching - expanded for global coverage
     const namedColors = {
       red: { r: 255, g: 0, b: 0 },
       orange: { r: 255, g: 165, b: 0 },
@@ -191,7 +204,18 @@ class WardrobeAI {
       emerald: { r: 80, g: 200, b: 120 },
       teal: { r: 0, g: 128, b: 128 },
       gold: { r: 255, g: 215, b: 0 },
-      silver: { r: 192, g: 192, b: 192 }
+      silver: { r: 192, g: 192, b: 192 },
+      violet: { r: 122, g: 40, b: 138 },
+      indigo: { r: 75, g: 0, b: 130 },
+      maroon: { r: 128, g: 0, b: 0 },
+      coral: { r: 255, g: 127, b: 80 },
+      lavender: { r: 230, g: 230, b: 250 },
+      magenta: { r: 255, g: 0, b: 255 },
+      turquoise: { r: 64, g: 224, b: 208 },
+      rust: { r: 183, g: 65, b: 14 },
+      tan: { r: 210, g: 180, b: 140 },
+      peach: { r: 255, g: 218, b: 185 },
+      mustard: { r: 255, g: 219, b: 88 }
     };
 
     // Find the closest named color
@@ -216,6 +240,17 @@ class WardrobeAI {
       analogous: colorWheelInfo?.analogous || null,
       universal: colorWheelInfo?.universal || false
     };
+  }
+
+  /**
+   * Convenience method: get just the color name from a HEX code
+   * Used by ai.js routes to convert legacy color format
+   * @param {string} hex - HEX color code
+   * @returns {string|null} Color name or null
+   */
+  static getColorNameFromHex(hex) {
+    const info = this.getColorInfoFromHex(hex);
+    return info?.name || null;
   }
 
   /**
@@ -333,7 +368,7 @@ class WardrobeAI {
   static isNeutralColor(hex, colorName) {
     if (colorName) {
       const name = colorName.toLowerCase();
-      if (['white', 'black', 'grey', 'gray', 'beige', 'navy', 'cream', 'khaki', 'silver'].includes(name)) return true;
+      if (['white', 'black', 'grey', 'gray', 'beige', 'navy', 'cream', 'khaki', 'silver', 'tan'].includes(name)) return true;
     }
     const hsl = this.hexToHsl(hex);
     if (!hsl) return false;
@@ -344,10 +379,11 @@ class WardrobeAI {
   }
 
   static getColorPairHarmony(item1, item2, reasons) {
-    const hex1 = item1.colorHex || item1.colors?.[0]?.hex;
-    const hex2 = item2.colorHex || item2.colors?.[0]?.hex;
-    const name1 = item1.colorName || item1.colors?.[0]?.name;
-    const name2 = item2.colorName || item2.colors?.[0]?.name;
+    // Support both new AI color format, colorAnalysis format and legacy colors[] format
+    const hex1 = item1.colorHex || item1.color?.primary?.hex || item1.colorAnalysis?.primary?.hex || item1.colors?.[0]?.hex;
+    const hex2 = item2.colorHex || item2.color?.primary?.hex || item2.colorAnalysis?.primary?.hex || item2.colors?.[0]?.hex;
+    const name1 = item1.colorName || item1.color?.primary?.name || item1.colorAnalysis?.primary?.name || item1.colors?.[0]?.name;
+    const name2 = item2.colorName || item2.color?.primary?.name || item2.colorAnalysis?.primary?.name || item2.colors?.[0]?.name;
 
     if (!hex1 || !hex2) return 50;
 
@@ -388,8 +424,9 @@ class WardrobeAI {
   }
 
   static getPatternPairScore(item1, item2, reasons) {
-    const pat1 = (item1.pattern || item1.patterns?.[0] || 'solid').toLowerCase();
-    const pat2 = (item2.pattern || item2.patterns?.[0] || 'solid').toLowerCase();
+    // Support new AI pattern format, patternAnalysis format, and legacy formats
+    const pat1 = (item1.pattern?.type || item1.patternAnalysis?.type || (typeof item1.pattern === 'string' ? item1.pattern : null) || item1.patterns?.[0] || 'solid').toLowerCase();
+    const pat2 = (item2.pattern?.type || item2.patternAnalysis?.type || (typeof item2.pattern === 'string' ? item2.pattern : null) || item2.patterns?.[0] || 'solid').toLowerCase();
 
     const isSolid1 = pat1 === 'solid' || pat1 === 'none';
     const isSolid2 = pat2 === 'solid' || pat2 === 'none';
@@ -417,8 +454,9 @@ class WardrobeAI {
   }
 
   static getSeasonPairScore(item1, item2, reasons) {
-    const s1 = item1.season;
-    const s2 = item2.season;
+    // Support both new AI styling.season format and top-level season[] format
+    const s1 = item1.styling?.season || item1.season;
+    const s2 = item2.styling?.season || item2.season;
     
     const arr1 = Array.isArray(s1) ? s1 : (s1 ? [s1] : ['all']);
     const arr2 = Array.isArray(s2) ? s2 : (s2 ? [s2] : ['all']);
@@ -445,31 +483,45 @@ class WardrobeAI {
    * Calculate comprehensive outfit score
    */
   static calculateOutfitScore(outfitItems, season = null, occasion = null) {
-    // Extract primary colors from each item (new format: { hex, rgb, percentage })
+    // Extract primary colors from each item - support both new AI and legacy formats
     const colors = outfitItems.flatMap(item => {
+      // Prefer color.primary or colorAnalysis.primary (new AI formats)
+      if (item.color?.primary?.name) return [item.color.primary.name];
+      if (item.colorAnalysis?.primary?.name) return [item.colorAnalysis.primary.name];
+      // Fallback to colors[] hex-based extraction (legacy format)
       if (!item.colors || item.colors.length === 0) return [];
-      // Get the first (most dominant) color's hex and convert to color name
       const primaryHex = item.colors[0]?.hex;
       if (!primaryHex) return [];
       const colorInfo = this.getColorInfoFromHex(primaryHex);
       return colorInfo ? [colorInfo.name] : [];
     });
 
-    const styles = outfitItems.map(item => item.style).filter(Boolean);
+    // Extract styles - support both styling.style (AI) and top-level style
+    const styles = outfitItems.map(item => item.styling?.style || item.style).filter(Boolean);
+    
+    // Extract patterns - support both pattern.type, patternAnalysis.type (AI) and patterns[] (legacy)
     const patterns = outfitItems.flatMap(item =>
+      item.pattern?.type ? [item.pattern.type] :
+      item.patternAnalysis?.type ? [item.patternAnalysis.type] :
       item.patterns ? item.patterns : ['none']
     );
-    const seasons = outfitItems.flatMap(item =>
+    
+    // Extract seasons - support both styling.season (AI) and top-level season[]
+    const itemSeasons = outfitItems.flatMap(item =>
+      item.styling?.season ? item.styling.season :
       item.season ? item.season : ['all-season']
     );
+    
+    // Extract occasions - support both styling.occasion (AI) and top-level occasion[]
     const occasions = outfitItems.flatMap(item =>
+      item.styling?.occasion ? item.styling.occasion :
       item.occasion ? item.occasion : ['everyday']
     );
 
     const colorHarmony = this.calculateColorHarmony(colors);
     const styleConsistency = this.calculateStyleConsistency(styles);
     const patternCompatibility = this.checkPatternCompatibility(patterns);
-    const seasonalScore = season ? this.calculateSeasonality(seasons, season) : 100;
+    const seasonalScore = season ? this.calculateSeasonality(itemSeasons, season) : 100;
     const versatilityScore = this.calculateVersatility(occasions);
 
     // Weighted average
@@ -505,8 +557,8 @@ class WardrobeAI {
     const matches = [];
 
     wardrobeItems.forEach(wardrobeItem => {
-      if (wardrobeItem._id.toString() === item._id.toString()) return;
-      if (!wardrobeItem.isAvailable) return;
+      if (wardrobeItem._id && item._id && wardrobeItem._id.toString() === item._id.toString()) return;
+      if (wardrobeItem.isAvailable === false) return;
 
       const reasons = [];
       const colorScore = this.getColorPairHarmony(item, wardrobeItem, reasons);
@@ -521,8 +573,9 @@ class WardrobeAI {
         reasons.push("Pieces coordinate well");
       }
 
-      const colorName = wardrobeItem.colorName || wardrobeItem.colors?.[0]?.name || 'Unknown';
-      const colorHex = wardrobeItem.colorHex || wardrobeItem.colors?.[0]?.hex || '#000000';
+      // Resolve color name and hex from either new AI formats or legacy format
+      const colorName = wardrobeItem.color?.primary?.name || wardrobeItem.colorAnalysis?.primary?.name || wardrobeItem.colorName || wardrobeItem.colors?.[0]?.name || 'Unknown';
+      const colorHex = wardrobeItem.color?.primary?.hex || wardrobeItem.colorAnalysis?.primary?.hex || wardrobeItem.colorHex || wardrobeItem.colors?.[0]?.hex || '#000000';
 
       matches.push({
         itemId: wardrobeItem._id,
@@ -541,7 +594,7 @@ class WardrobeAI {
 
     return matches
       .sort((a, b) => b.matchScore - a.matchScore)
-      .slice(0, 3);
+      .slice(0, limit);
   }
 
   /**
@@ -565,17 +618,23 @@ class WardrobeAI {
 
     const combinations = [];
 
-    // Generate combinations by category
+    // Generate combinations by category - expanded for global clothing categories
     const categoryMapping = {
       tops: ['bottoms', 'shoes', 'accessories'],
       bottoms: ['tops', 'shoes', 'accessories'],
       shoes: ['tops', 'bottoms', 'accessories'],
       outerwear: ['tops', 'bottoms', 'shoes'],
       dresses: ['shoes', 'accessories', 'outerwear'],
-      accessories: ['tops', 'bottoms', 'dresses']
+      accessories: ['tops', 'bottoms', 'dresses'],
+      // Global/traditional clothing categories
+      traditional: ['shoes', 'accessories', 'outerwear'],
+      ethnic: ['shoes', 'accessories', 'outerwear'],
+      sarees: ['shoes', 'accessories', 'outerwear'],
+      lehenga: ['shoes', 'accessories'],
+      kurta: ['bottoms', 'shoes', 'accessories']
     };
 
-    const targetCategories = categoryMapping[newItem.category] || [];
+    const targetCategories = categoryMapping[newItem.category] || ['tops', 'bottoms', 'shoes', 'accessories'];
 
     targetCategories.forEach(category => {
       const categoryItems = filteredWardrobe.filter(item => item.category === category);
@@ -595,7 +654,8 @@ class WardrobeAI {
         }) ? 10 : 0;
 
         // Bonus for preferred style
-        const styleBonus = stylePreferences.includes(match.item.style) ? 5 : 0;
+        const matchStyle = match.item.styling?.style || match.item.style;
+        const styleBonus = stylePreferences.includes(matchStyle) ? 5 : 0;
 
         combinations.push({
           primaryMatch: match.item,
@@ -620,9 +680,9 @@ class WardrobeAI {
   static explainMatch(item1, item2, scores) {
     const reasons = [];
 
-    // Color harmony explanation - extract color names from HEX
-    const hex1 = item1.colors?.[0]?.hex;
-    const hex2 = item2.colors?.[0]?.hex;
+    // Color harmony explanation - support both new and legacy formats
+    const hex1 = item1.color?.primary?.hex || item1.colorAnalysis?.primary?.hex || item1.colors?.[0]?.hex;
+    const hex2 = item2.color?.primary?.hex || item2.colorAnalysis?.primary?.hex || item2.colors?.[0]?.hex;
     const colorInfo1 = hex1 ? this.getColorInfoFromHex(hex1) : null;
     const colorInfo2 = hex2 ? this.getColorInfoFromHex(hex2) : null;
     const color1 = colorInfo1?.name;
@@ -638,23 +698,27 @@ class WardrobeAI {
       }
     }
 
-    // Style explanation
-    if (item1.style === item2.style) {
-      reasons.push(`Both pieces share ${item1.style} style for a cohesive look`);
+    // Style explanation - support both AI and legacy formats
+    const style1 = item1.styling?.style || item1.style;
+    const style2 = item2.styling?.style || item2.style;
+    if (style1 && style2 && style1 === style2) {
+      reasons.push(`Both pieces share ${style1} style for a cohesive look`);
     }
 
-    // Pattern explanation
-    const pattern1 = item1.patterns?.[0];
-    const pattern2 = item2.patterns?.[0];
+    // Pattern explanation - support both new, old, and legacy formats
+    const pattern1 = item1.pattern?.type || item1.patternAnalysis?.type || item1.patterns?.[0];
+    const pattern2 = item2.pattern?.type || item2.patternAnalysis?.type || item2.patterns?.[0];
     if (pattern1 === 'solid' && pattern2 !== 'solid') {
       reasons.push('Solid base allows patterned piece to stand out');
     } else if (pattern1 === pattern2 && pattern1 !== 'solid') {
       reasons.push('Same pattern family creates visual unity');
     }
 
-    // Season explanation
-    const sharedSeasons = (item1.season || []).filter(s =>
-      (item2.season || []).includes(s)
+    // Season explanation - support both AI and legacy formats
+    const season1 = item1.styling?.season || item1.season || [];
+    const season2 = item2.styling?.season || item2.season || [];
+    const sharedSeasons = (Array.isArray(season1) ? season1 : [season1]).filter(s =>
+      (Array.isArray(season2) ? season2 : [season2]).includes(s)
     );
     if (sharedSeasons.length > 0) {
       reasons.push(`Perfect for ${sharedSeasons.join(' and ')}`);
@@ -675,42 +739,51 @@ class WardrobeAI {
     } = options;
 
     // Filter items by criteria
-    let filteredItems = wardrobeItems.filter(item => item.isAvailable);
+    let filteredItems = wardrobeItems.filter(item => item.isAvailable !== false);
 
     if (season !== 'all-season') {
-      filteredItems = filteredItems.filter(item =>
-        !item.season?.length || item.season.includes(season) || item.season.includes('all-season')
-      );
+      filteredItems = filteredItems.filter(item => {
+        const itemSeasons = item.styling?.season || item.season || [];
+        const arr = Array.isArray(itemSeasons) ? itemSeasons : [itemSeasons];
+        return !arr.length || arr.includes(season) || arr.includes('all-season');
+      });
     }
 
     if (occasion !== 'everyday') {
-      filteredItems = filteredItems.filter(item =>
-        !item.occasion?.length || item.occasion.includes(occasion) || item.occasion.includes('everyday')
-      );
+      filteredItems = filteredItems.filter(item => {
+        const itemOccasions = item.styling?.occasion || item.occasion || [];
+        const arr = Array.isArray(itemOccasions) ? itemOccasions : [itemOccasions];
+        return !arr.length || arr.includes(occasion) || arr.includes('everyday');
+      });
     }
 
     if (style) {
       filteredItems = filteredItems.filter(item =>
-        item.style === style
+        (item.styling?.style || item.style) === style
       );
     }
 
     const suggestions = [];
     const generatedCombinations = new Set();
 
-    // Group items by category
+    // Group items by category - expanded for global clothing categories
     const byCategory = {
       tops: filteredItems.filter(i => i.category === 'tops'),
       bottoms: filteredItems.filter(i => i.category === 'bottoms'),
       shoes: filteredItems.filter(i => i.category === 'shoes'),
       dresses: filteredItems.filter(i => i.category === 'dresses'),
       outerwear: filteredItems.filter(i => i.category === 'outerwear'),
-      accessories: filteredItems.filter(i => i.category === 'accessories')
+      accessories: filteredItems.filter(i => i.category === 'accessories'),
+      traditional: filteredItems.filter(i => i.category === 'traditional' || i.category === 'ethnic'),
+      sarees: filteredItems.filter(i => i.category === 'sarees' || i.identity?.type === 'sari' || i.identity?.type === 'saree'),
+      lehenga: filteredItems.filter(i => i.category === 'lehenga'),
+      kurta: filteredItems.filter(i => i.category === 'kurta')
     };
 
-    // Generate dress-based outfits
-    if (byCategory.dresses.length > 0) {
-      byCategory.dresses.forEach(dress => {
+    // Generate dress-based outfits (includes traditional/ethnic one-piece garments)
+    const onePieceCategories = [...byCategory.dresses, ...byCategory.sarees, ...byCategory.lehenga];
+    if (onePieceCategories.length > 0) {
+      onePieceCategories.forEach(dress => {
         const key = `dress-${dress._id}`;
 
         // Add shoes
@@ -743,9 +816,10 @@ class WardrobeAI {
       });
     }
 
-    // Generate top-bottom combinations
-    if (byCategory.tops.length > 0 && byCategory.bottoms.length > 0) {
-      byCategory.tops.slice(0, 8).forEach(top => {
+    // Generate top-bottom combinations (includes kurtas with bottoms)
+    const topItems = [...byCategory.tops, ...byCategory.kurta];
+    if (topItems.length > 0 && byCategory.bottoms.length > 0) {
+      topItems.slice(0, 8).forEach(top => {
         byCategory.bottoms.slice(0, 8).forEach(bottom => {
           const key = `${top._id}-${bottom._id}`;
           if (generatedCombinations.has(key)) return;
@@ -754,7 +828,7 @@ class WardrobeAI {
 
           // Add shoes
           const topShoes = this.findMatchesForItem(
-            { ...top, category: 'tops' },
+            { ...top, category: top.category || 'tops' },
             byCategory.shoes.slice(0, 5),
             1
           );

@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const authMiddleware = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 
 const router = express.Router();
@@ -124,16 +125,9 @@ router.post(
  * @desc    Get current user
  * @access  Private
  */
-router.get('/me', async (req, res) => {
+router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
-    const user = await User.findById(decoded.userId).select('-password');
+    const user = await User.findById(req.user.id).select('-password');
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
