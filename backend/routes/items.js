@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Item = require('../models/Item');
 const User = require('../models/User');
 const WardrobeAI = require('../utils/wardrobeAI');
@@ -18,42 +19,42 @@ function mergeAiData(itemData) {
   try {
     const aiDataObj = typeof itemData.aiData === 'string' ? JSON.parse(itemData.aiData) : itemData.aiData;
 
-    // Map AI response keys to schema fields
-    itemData.identity = aiDataObj.identity;
+    const ensureObject = (val, defaultKey) => {
+      if (!val) return undefined;
+      if (typeof val === 'string') return { [defaultKey]: val };
+      if (typeof val === 'object' && !Array.isArray(val)) return val;
+      return undefined;
+    };
+
+    // Map and sanitize AI response keys to match schema object structures
+    itemData.identity = ensureObject(aiDataObj.identity, 'type');
     
-    // Sanitize color to ensure it matches the schema object structure
     if (aiDataObj.color) {
       if (typeof aiDataObj.color === 'string') {
-        itemData.color = {
-          primary: {
-            name: aiDataObj.color,
-            hex: '#000000',
-            family: 'neutral'
-          }
-        };
+        itemData.color = { primary: { name: aiDataObj.color, hex: '#000000', family: 'neutral' } };
       } else {
         itemData.color = aiDataObj.color;
       }
     }
     
-    // Sanitize pattern to ensure it matches the schema object structure (preventing String-to-Object CastError)
-    if (aiDataObj.pattern) {
-      if (typeof aiDataObj.pattern === 'string') {
-        itemData.pattern = {
-          type: aiDataObj.pattern
-        };
-      } else {
-        itemData.pattern = aiDataObj.pattern;
-      }
+    itemData.pattern = ensureObject(aiDataObj.pattern, 'type');
+    itemData.fit = ensureObject(aiDataObj.fit, 'fit_type');
+    itemData.construction = ensureObject(aiDataObj.construction, 'fabric');
+    itemData.dimensions = ensureObject(aiDataObj.dimensions, 'length');
+    itemData.styling = ensureObject(aiDataObj.styling, 'style');
+    itemData.condition = ensureObject(aiDataObj.condition, 'estimatedWear');
+    
+    if (aiDataObj.confidence) {
+      itemData.confidence = typeof aiDataObj.confidence === 'string' || typeof aiDataObj.confidence === 'number'
+        ? { overall: parseFloat(aiDataObj.confidence) || 0 }
+        : aiDataObj.confidence;
     }
 
-    itemData.fit = aiDataObj.fit;
-    itemData.construction = aiDataObj.construction;
-    itemData.dimensions = aiDataObj.dimensions;
-    itemData.styling = aiDataObj.styling;
-    itemData.matching = aiDataObj.matching;
-    itemData.condition = aiDataObj.condition;
-    itemData.confidence = aiDataObj.confidence;
+    if (aiDataObj.matching) {
+      itemData.matching = typeof aiDataObj.matching === 'string'
+        ? { matchTags: [aiDataObj.matching] }
+        : aiDataObj.matching;
+    }
 
     // Auto-populate top-level fields from AI analysis if not explicitly provided
     if (aiDataObj.identity?.category && !itemData.category) {
@@ -165,8 +166,9 @@ router.get('/', authMiddleware, async (req, res) => {
  */
 router.get('/statistics/summary', authMiddleware, async (req, res) => {
   try {
+    const userId = new mongoose.Types.ObjectId(req.user.id);
     const stats = await Item.aggregate([
-      { $match: { user: req.user.id } },
+      { $match: { user: userId } },
       {
         $group: {
           _id: null,
@@ -184,7 +186,7 @@ router.get('/statistics/summary', authMiddleware, async (req, res) => {
     ]);
 
     const categoryStats = await Item.aggregate([
-      { $match: { user: req.user.id } },
+      { $match: { user: userId } },
       {
         $group: {
           _id: '$category',
@@ -427,6 +429,9 @@ router.post('/', authMiddleware, async (req, res) => {
       ...req.body,
       user: req.user.id
     };
+
+    // Merge AI data and auto-populate top-level fields (in case AI data was submitted without an image upload)
+    mergeAiData(itemData);
 
     const item = new Item(itemData);
     await item.save();

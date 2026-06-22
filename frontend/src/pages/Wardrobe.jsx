@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Shirt,
@@ -14,16 +14,19 @@ import {
   List,
   TrendingUp,
 } from 'lucide-react';
-import { itemsAPI } from '@/services/api';
+import { itemsAPI, getImageUrl } from '@/services/api';
 import { useStore } from '@/store/useStore';
 import toast from 'react-hot-toast';
 import AddItemModal from '@/components/AddItemModal';
+import EditItemModal from '@/components/EditItemModal';
 
 const Wardrobe = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState(null);
   const { data, isLoading } = useQuery(
     'wardrobe-items',
     () => itemsAPI.getAll(),
@@ -159,7 +162,7 @@ const Wardrobe = () => {
           animate={{ opacity: 1 }}
           className={
             viewMode === 'grid'
-              ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4'
+              ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6'
               : 'space-y-4'
           }
         >
@@ -169,104 +172,158 @@ const Wardrobe = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.02, y: -4 }}
               onClick={() => navigate(`/wardrobe/${item._id}`)}
-              className={`card cursor-pointer group ${viewMode === 'list' ? 'flex items-center gap-4 p-4' : ''}`}
+              className={`relative cursor-pointer group glass border border-gray-700 hover:border-neon-green/50 hover:shadow-[0_0_20px_rgba(57,255,20,0.15)] transition-all duration-300 overflow-hidden ${
+                viewMode === 'list' ? 'flex items-center gap-4 p-4 rounded-xl' : 'rounded-2xl flex flex-col'
+              }`}
             >
-              {/* Item Image Placeholder */}
-              <div className={`relative ${
-                viewMode === 'grid'
-                  ? 'aspect-square rounded-lg bg-black-600'
-                  : 'w-20 h-20 rounded-lg bg-black-600'
-              } overflow-hidden`}>
+              {/* Image Container */}
+              <div className={`relative overflow-hidden ${
+                viewMode === 'grid' ? 'w-full aspect-[4/5] bg-black-800' : 'w-24 h-24 rounded-lg bg-black-800 shrink-0'
+              }`}>
                 {item.images?.[0]?.url ? (
-                  <>
-                    <img
-                      src={item.images[0].url}
-                      alt={item.name}
-                      className="w-full h-full object-cover blur-sm group-hover:blur-none transition-all duration-300"
-                    />
-                  </>
+                  <img
+                    src={getImageUrl(item.images[0].url)}
+                    alt={item.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                  />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-black-600 to-black-700">
-                    <Shirt className={`${
-                      viewMode === 'grid' ? 'w-12 h-12' : 'w-8 h-8'
-                    } text-gray-600 group-hover:text-neon-green transition-colors`} />
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-black-700 to-black-800">
+                    <Shirt className={`${viewMode === 'grid' ? 'w-16 h-16' : 'w-8 h-8'} text-gray-600 group-hover:text-neon-green/50 transition-colors duration-500`} />
+                  </div>
+                )}
+                
+                {/* AI Badge */}
+                {item.aiAnalyzed && (
+                  <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded border border-neon-green/30 flex items-center gap-1 shadow-lg">
+                    <span className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
+                    <span className="text-[10px] font-bold text-neon-green uppercase tracking-wider">AI Synced</span>
                   </div>
                 )}
 
-                {/* Favorite Badge */}
-                {item.isFavorite && (
-                  <div className="absolute top-2 right-2 p-1.5 rounded-full bg-red-500/80">
-                    <Heart className="w-3 h-3 text-white fill-white" />
-                  </div>
-                )}
-
-                {/* Hover Overlay */}
-                <div className={`absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity ${
-                  viewMode === 'grid' ? 'flex items-center justify-center' : 'hidden'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast.info('Edit coming soon!');
-                      }}
-                      className="p-2 rounded-lg bg-black-700 hover:bg-neon-green hover:text-black-800 transition-all"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast.info('Delete coming soon!');
-                      }}
-                      className="p-2 rounded-lg bg-black-700 hover:bg-red-500 hover:text-white transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </motion.button>
-                  </div>
+                {/* Floating Actions on Image Hover */}
+                <div className={`absolute top-3 right-3 flex flex-col gap-2 translate-x-12 group-hover:translate-x-0 transition-transform duration-300 ${viewMode === 'list' ? 'hidden' : ''}`}>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      itemsAPI.toggleFavorite(item._id).then(() => {
+                        toast.success('Favorite updated!');
+                        queryClient.invalidateQueries('wardrobe-items');
+                      });
+                    }}
+                    className={`p-2 rounded-full backdrop-blur-md shadow-lg transition-colors ${
+                      item.isFavorite ? 'bg-red-500/20 border-red-500/50 text-red-500' : 'bg-black/60 border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-400'
+                    } border`}
+                  >
+                    <Heart className={`w-4 h-4 ${item.isFavorite ? 'fill-current' : ''}`} />
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditItem(item);
+                    }}
+                    className="p-2 rounded-full bg-black/60 backdrop-blur-md border border-gray-600/50 text-gray-300 hover:text-white hover:border-gray-400 shadow-lg transition-colors"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm('Delete this item?')) {
+                        itemsAPI.delete(item._id).then(() => {
+                          toast.success('Deleted!');
+                          queryClient.invalidateQueries('wardrobe-items');
+                        });
+                      }
+                    }}
+                    className="p-2 rounded-full bg-black/60 backdrop-blur-md border border-gray-600/50 text-gray-300 hover:text-red-500 hover:border-red-500/50 shadow-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </motion.button>
                 </div>
+                
+                {/* Bottom Gradient Overlay for Grid View */}
+                {viewMode === 'grid' && (
+                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black-900 via-black-900/40 to-transparent pointer-events-none" />
+                )}
               </div>
 
-              {/* Item Info */}
-              <div className={viewMode === 'grid' ? 'mt-3' : 'flex-1'}>
-                <h3 className="font-semibold text-white truncate group-hover:text-neon-green transition-colors">
-                  {item.name}
-                </h3>
-                <p className="text-sm text-gray-400 capitalize">{item.category}</p>
+              {/* Item Info Card Body */}
+              <div className={`${viewMode === 'grid' ? 'p-5 relative z-10 flex flex-col flex-1 bg-black-800/90' : 'flex-1'}`}>
+                <div className="flex justify-between items-start mb-1">
+                  <h3 className="font-bold text-lg text-white group-hover:text-neon-green transition-colors line-clamp-1">
+                    {item.name}
+                  </h3>
+                  {viewMode === 'list' && item.isFavorite && (
+                    <Heart className="w-4 h-4 text-red-500 fill-current shrink-0 ml-2" />
+                  )}
+                </div>
+                
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-3 font-semibold">
+                  {item.category} {item.subCategory ? `• ${item.subCategory}` : ''}
+                </p>
 
                 {/* Color swatches */}
-                <div className="flex gap-1 mt-2">
-                  {item.colors?.slice(0, 3).map((color, i) => (
+                <div className="flex items-center gap-1.5 mb-3">
+                  {item.colors?.slice(0, 4).map((color, i) => (
                     <div
                       key={i}
-                      className="w-3 h-3 rounded-full border border-gray-600"
+                      className="w-4 h-4 rounded-full border border-gray-600/50 shadow-inner"
                       style={{ backgroundColor: getColorValue(color) }}
+                      title={color?.name || 'Color'}
                     />
                   ))}
-                  {item.colors?.length > 3 && (
-                    <span className="text-xs text-gray-500">+{item.colors.length - 3}</span>
+                  {item.colors?.length > 4 && (
+                    <span className="text-[10px] text-gray-500 font-medium bg-black-700 px-1.5 py-0.5 rounded-full">
+                      +{item.colors.length - 4}
+                    </span>
+                  )}
+                  {item.colors?.length === 0 && item.color?.primary?.hex && (
+                    <div
+                      className="w-4 h-4 rounded-full border border-gray-600/50 shadow-inner"
+                      style={{ backgroundColor: item.color.primary.hex }}
+                      title={item.color.primary.name}
+                    />
                   )}
                 </div>
 
-                {/* Wear count */}
-                {item.wearCount > 0 && (
-                  <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
-                    <TrendingUp className="w-3 h-3 text-neon-green" />
-                    <span>Worn {item.wearCount}x</span>
-                  </div>
-                )}
+                <div className="mt-auto pt-3 border-t border-gray-700/50 flex items-center justify-between">
+                  {item.wearCount > 0 ? (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-black-700/50 px-2 py-1 rounded-md">
+                      <TrendingUp className="w-3.5 h-3.5 text-neon-green" />
+                      <span>{item.wearCount} Wears</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic">Unworn</span>
+                  )}
+                  
+                  {item.season?.length > 0 && (
+                    <span className="text-[10px] text-gray-400 uppercase tracking-wide bg-black-700/50 px-2 py-1 rounded-md">
+                      {item.season[0]}
+                    </span>
+                  )}
+                </div>
               </div>
             </motion.div>
           ))}
         </motion.div>
       )}
       <AddItemModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <EditItemModal
+        isOpen={!!editItem}
+        onClose={() => {
+          setEditItem(null);
+          queryClient.invalidateQueries('wardrobe-items');
+        }}
+        item={editItem}
+      />
     </div>
   );
 };

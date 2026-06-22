@@ -10,6 +10,7 @@ const createFormData = (data, file) => {
   if (data.brand) formData.append('brand', data.brand);
   if (data.season) formData.append('season', data.season);
   if (data.tags) formData.append('tags', data.tags);
+  if (data.aiData) formData.append('aiData', typeof data.aiData === 'string' ? data.aiData : JSON.stringify(data.aiData));
   if (file) formData.append('image', file);
   return formData;
 };
@@ -24,6 +25,7 @@ const createFormDataMultiple = (data, files) => {
   if (data.brand) formData.append('brand', data.brand);
   if (data.season) formData.append('season', data.season);
   if (data.tags) formData.append('tags', data.tags);
+  if (data.aiData) formData.append('aiData', typeof data.aiData === 'string' ? data.aiData : JSON.stringify(data.aiData));
   if (files && files.length > 0) {
     files.forEach((file, index) => {
       formData.append('images', file);
@@ -33,10 +35,10 @@ const createFormDataMultiple = (data, files) => {
 };
 
 // Helper function to get full image URL (Cloudinary URLs don't need transformation)
-const getImageUrl = (imageUrl) => {
+export const getImageUrl = (imageUrl) => {
   if (!imageUrl) return null;
-  // Cloudinary URLs are full URLs, just return as is
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+  // Cloudinary URLs and base64 data URIs are full URLs, just return as is
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:')) {
     return imageUrl;
   }
   // Fallback for relative URLs
