@@ -10,6 +10,7 @@ export default function ImageUploadAnalyzer({ onAnalysisComplete, onImageSelecte
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [fullAiResponse, setFullAiResponse] = useState(null);
   const [formData, setFormData] = useState({
     type: '',
     style: '',
@@ -54,7 +55,14 @@ export default function ImageUploadAnalyzer({ onAnalysisComplete, onImageSelecte
       data.append('image', selectedFile);
 
       const response = await aiAPI.analyzeImage(data);
-      const { type, style, pattern, season, imageBase64 } = response.data.data;
+      const fullData = response.data.data;
+      setFullAiResponse(fullData);
+      
+      const type = fullData.identity?.type || fullData.type || '';
+      const style = fullData.styling?.style || fullData.style || '';
+      const pattern = typeof fullData.pattern === 'object' ? (fullData.pattern?.type || '') : (fullData.pattern || '');
+      const season = Array.isArray(fullData.styling?.season) ? (fullData.styling.season[0] || '') : (fullData.styling?.season || fullData.season || '');
+      const imageBase64 = fullData.imageBase64;
 
       // Extract color
       const img = new Image();
@@ -98,8 +106,11 @@ export default function ImageUploadAnalyzer({ onAnalysisComplete, onImageSelecte
 
   const handleConfirm = () => {
     if (onAnalysisComplete) {
-      // Pass the fully assembled data back
-      onAnalysisComplete(formData);
+      // Pass the fully assembled data back, including the deep AI response
+      onAnalysisComplete({
+        ...formData,
+        aiData: fullAiResponse
+      });
     }
   };
 
@@ -107,10 +118,14 @@ export default function ImageUploadAnalyzer({ onAnalysisComplete, onImageSelecte
     setSelectedFile(null);
     setPreviewUrl(null);
     setAnalysisResult(null);
+    setFullAiResponse(null);
     setError('');
     setFormData({
       type: '', style: '', pattern: '', season: '', colorHex: '', colorName: ''
     });
+    if (onImageSelected) {
+      onImageSelected(null);
+    }
   };
 
   // Form Field Animation Variants

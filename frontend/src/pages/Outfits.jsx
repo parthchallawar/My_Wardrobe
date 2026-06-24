@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles,
@@ -8,15 +8,17 @@ import {
   Heart,
   Trash2,
   Wand2,
-  RefreshCw,
   Calendar,
 } from 'lucide-react';
 import { outfitsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
+import CreateOutfitModal from '@/components/CreateOutfitModal';
 
 const Outfits = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { data, isLoading, refetch } = useQuery(
     'outfits',
     () => outfitsAPI.getAll(),
@@ -79,7 +81,7 @@ const Outfits = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => toast.info('Create outfit coming soon!')}
+            onClick={() => setIsCreateModalOpen(true)}
             className="btn-primary flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
@@ -243,18 +245,25 @@ const Outfits = () => {
                       whileTap={{ scale: 0.9 }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        toast.info('Edit coming soon!');
+                        outfitsAPI.toggleFavorite(outfit._id).then(() => {
+                          queryClient.invalidateQueries('outfits');
+                        });
                       }}
-                      className="p-1.5 rounded hover:bg-black-700 transition-colors"
+                      className={`p-1.5 rounded hover:bg-black-700 transition-colors ${outfit.isFavorite ? 'text-red-500' : 'text-gray-400'}`}
                     >
-                      <RefreshCw className="w-4 h-4 text-gray-400 hover:text-neon-green" />
+                      <Heart className={`w-4 h-4 ${outfit.isFavorite ? 'fill-current' : ''}`} />
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        toast.info('Delete coming soon!');
+                        if (window.confirm('Delete this outfit?')) {
+                          outfitsAPI.delete(outfit._id).then(() => {
+                            toast.success('Outfit deleted');
+                            queryClient.invalidateQueries('outfits');
+                          });
+                        }
                       }}
                       className="p-1.5 rounded hover:bg-black-700 transition-colors"
                     >
@@ -267,6 +276,10 @@ const Outfits = () => {
           ))}
         </motion.div>
       )}
+      <CreateOutfitModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 };

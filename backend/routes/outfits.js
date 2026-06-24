@@ -277,31 +277,62 @@ router.post('/generate', authMiddleware, async (req, res) => {
 
     const suggestions = WardrobeAI.generateOutfitSuggestions(wardrobeItems, options);
 
+    // Map plural category names to Outfit schema enum values
+    const categoryToType = {
+      tops: 'top', bottoms: 'bottom', shoes: 'shoes',
+      accessories: 'accessory', outerwear: 'layer', dresses: 'dress',
+      traditional: 'top', kurta: 'top', sarees: 'dress', lehenga: 'dress'
+    };
+
+    const validStyles = ['casual', 'formal', 'sporty', 'bohemian', 'minimalist', 'vintage', 'streetwear', 'glam'];
+    const safeNum = (val, fallback = 80) => {
+      const n = Number(val);
+      return isNaN(n) ? fallback : Math.round(Math.min(100, Math.max(0, n)));
+    };
+
     // Convert suggestions to outfit format
     const generatedOutfits = suggestions.map((suggestion, index) => {
       const colors = suggestion.items.flatMap(item =>
         item.colors ? [item.colors[0]?.primary] : []
       ).filter(Boolean);
 
+      const rawStyle = suggestion.items[0]?.style || 'casual';
+      const style = validStyles.includes(rawStyle) ? rawStyle : 'casual';
+      const bd = suggestion.breakdown || {};
+
       return {
         name: `AI Generated Outfit ${index + 1}`,
-        items: suggestion.items.map(item => ({ item: item._id, type: item.category })),
+        items: suggestion.items.map(item => ({
+          item: item._id,
+          type: categoryToType[item.category] || 'top'
+        })),
         season: options.season,
         occasion: options.occasion,
-        style: suggestion.items[0]?.style || 'casual',
+        style,
         colorScheme: {
           primary: colors[0] || 'black',
           secondary: colors[1] || null,
           accent: colors[2] || null
         },
-        aiScore: suggestion.score,
+        aiScore: {
+          overallMatch: safeNum(bd.overallMatch),
+          colorHarmony: safeNum(bd.colorHarmony),
+          styleConsistency: safeNum(bd.styleConsistency),
+          seasonality: safeNum(bd.seasonality, 100),
+          versatility: safeNum(bd.versatility, 75)
+        },
         generatedBy: 'ai'
       };
     });
 
+    // Save generated outfits to DB so they appear in the outfits list
+    const savedOutfits = await Outfit.insertMany(
+      generatedOutfits.map(o => ({ ...o, user: req.user.id }))
+    );
+
     res.json({
-      suggestions: generatedOutfits,
-      total: generatedOutfits.length
+      suggestions: savedOutfits,
+      total: savedOutfits.length
     });
   } catch (error) {
     console.error('Generate outfits error:', error);
