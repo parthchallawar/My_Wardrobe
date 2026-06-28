@@ -14,7 +14,7 @@ import {
   List,
   TrendingUp,
 } from 'lucide-react';
-import { itemsAPI, getImageUrl } from '@/services/api';
+import { itemsAPI, getThumbUrl } from '@/services/api';
 import { useStore } from '@/store/useStore';
 import toast from 'react-hot-toast';
 import AddItemModal from '@/components/AddItemModal';
@@ -182,9 +182,9 @@ const Wardrobe = () => {
               <div className={`relative overflow-hidden ${
                 viewMode === 'grid' ? 'w-full aspect-[4/5] bg-black-800' : 'w-24 h-24 rounded-lg bg-black-800 shrink-0'
               }`}>
-                {item.images?.[0]?.url ? (
+                {getThumbUrl(item) ? (
                   <img
-                    src={getImageUrl(item.images[0].url)}
+                    src={getThumbUrl(item)}
                     alt={item.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                   />

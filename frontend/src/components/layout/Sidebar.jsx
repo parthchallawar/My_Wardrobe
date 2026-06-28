@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   BarChart3,
   Settings,
+  CalendarDays,
   ChevronRight,
   ChevronLeft,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ const menuItems = [
   { path: '/wardrobe', label: 'Wardrobe', icon: Shirt },
   { path: '/outfits', label: 'Outfits', icon: Sparkles },
   { path: '/shop-match', label: 'Shop Match', icon: ShoppingCart },
+  { path: '/calendar', label: 'Wear Calendar', icon: CalendarDays },
   { path: '/insights', label: 'Insights', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];

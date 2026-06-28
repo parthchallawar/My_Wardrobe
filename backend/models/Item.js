@@ -52,6 +52,7 @@ const itemSchema = new mongoose.Schema({
   images: [{
     url: { type: String },
     publicId: { type: String },
+    thumbnailUrl: { type: String },
     isPrimary: { type: Boolean, default: false },
     width: { type: Number },
     height: { type: Number },
@@ -65,6 +66,7 @@ const itemSchema = new mongoose.Schema({
   isFavorite: { type: Boolean, default: false },
   wearCount: { type: Number, default: 0 },
   lastWorn: { type: Date, default: null },
+  timeOfDay: { type: String, enum: ['day', 'night', 'both'], default: 'both' },
 
   // --- User-facing metadata ---
   brand: { type: String, default: null },

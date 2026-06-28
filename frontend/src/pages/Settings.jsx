@@ -11,22 +11,16 @@ import {
   X,
   Check,
   Trash2,
+  Ruler,
 } from 'lucide-react';
 import { usersAPI } from '@/services/api';
 import { useStore } from '@/store/useStore';
 import toast from 'react-hot-toast';
+import { STYLES, SEASONS, COLORS } from '@/constants/taxonomy';
 
-const styleOptions = [
-  'casual', 'formal', 'sporty', 'bohemian', 'minimalist', 'vintage', 'streetwear', 'glam'
-];
-
-const seasonOptions = ['spring', 'summer', 'fall', 'winter'];
-
-const colorOptions = [
-  'black', 'white', 'gray', 'navy', 'beige', 'brown',
-  'red', 'blue', 'green', 'yellow', 'pink', 'purple',
-  'orange', 'burgundy', 'emerald', 'teal', 'khaki', 'olive'
-];
+const styleOptions = STYLES;
+const seasonOptions = SEASONS.filter(s => s.value !== 'all-season').map(s => s.value);
+const colorOptions = COLORS;
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -37,6 +31,7 @@ const Settings = () => {
     preferredColors: [],
     avoidColors: [],
     seasons: [],
+    bodyProfile: { skinUndertone: '', fitPreference: '', sizes: { top: '', bottom: '', shoe: '' } },
   });
 
   // Fetch preferences
@@ -46,11 +41,13 @@ const Settings = () => {
     {
       enabled: !!localStorage.getItem('wardrobe-ai-storage'),
       onSuccess: (data) => {
-        setPreferences(data.data.preferences || {
-          stylePreferences: [],
-          preferredColors: [],
-          avoidColors: [],
-          seasons: [],
+        const prefs = data.data.preferences || {};
+        setPreferences({
+          stylePreferences: prefs.stylePreferences || [],
+          preferredColors: prefs.preferredColors || [],
+          avoidColors: prefs.avoidColors || [],
+          seasons: prefs.seasons || [],
+          bodyProfile: prefs.bodyProfile || { skinUndertone: '', fitPreference: '', sizes: { top: '', bottom: '', shoe: '' } },
         });
       },
     }
@@ -326,6 +323,102 @@ const Settings = () => {
                   )}
                 </motion.button>
               ))}
+            </div>
+          </motion.div>
+
+          {/* Body & Fit Profile */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+            className="card p-6"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-lg bg-neon-green/10">
+                <Ruler className="w-5 h-5 text-neon-green" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Body & Fit</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Personalizes outfit & match recommendations</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {/* Skin Undertone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Skin Undertone</label>
+                <div className="flex gap-2">
+                  {['warm', 'cool', 'neutral'].map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setPreferences(p => ({ ...p, bodyProfile: { ...p.bodyProfile, skinUndertone: p.bodyProfile?.skinUndertone === t ? '' : t } }))}
+                      className={`flex-1 py-2 rounded-lg text-sm capitalize transition-all border ${
+                        preferences.bodyProfile?.skinUndertone === t
+                          ? 'bg-neon-green/20 border-neon-green text-neon-green font-medium'
+                          : 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fit Preference */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Fit Preference</label>
+                <div className="flex gap-2">
+                  {['slim', 'regular', 'relaxed'].map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setPreferences(p => ({ ...p, bodyProfile: { ...p.bodyProfile, fitPreference: p.bodyProfile?.fitPreference === f ? '' : f } }))}
+                      className={`flex-1 py-2 rounded-lg text-sm capitalize transition-all border ${
+                        preferences.bodyProfile?.fitPreference === f
+                          ? 'bg-neon-green/20 border-neon-green text-neon-green font-medium'
+                          : 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Size inputs */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Top Size</label>
+                <input
+                  type="text"
+                  placeholder="e.g. S, M, L, XL"
+                  value={preferences.bodyProfile?.sizes?.top || ''}
+                  onChange={e => setPreferences(p => ({ ...p, bodyProfile: { ...p.bodyProfile, sizes: { ...p.bodyProfile?.sizes, top: e.target.value } } }))}
+                  className="input-primary w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Bottom Size</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 30x32, M"
+                  value={preferences.bodyProfile?.sizes?.bottom || ''}
+                  onChange={e => setPreferences(p => ({ ...p, bodyProfile: { ...p.bodyProfile, sizes: { ...p.bodyProfile?.sizes, bottom: e.target.value } } }))}
+                  className="input-primary w-full"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Shoe Size</label>
+                <input
+                  type="text"
+                  placeholder="e.g. US 10, EU 43"
+                  value={preferences.bodyProfile?.sizes?.shoe || ''}
+                  onChange={e => setPreferences(p => ({ ...p, bodyProfile: { ...p.bodyProfile, sizes: { ...p.bodyProfile?.sizes, shoe: e.target.value } } }))}
+                  className="input-primary w-full"
+                />
+              </div>
             </div>
           </motion.div>
         </div>

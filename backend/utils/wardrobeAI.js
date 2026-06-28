@@ -3,6 +3,8 @@
  * Handles color theory, style matching, and outfit generation algorithms
  */
 
+const { normalizeCategory } = require('./categoryNormalizer');
+
 class WardrobeAI {
   // Color harmony rules and relationships - expanded for global clothing coverage
   static colorWheel = {
@@ -71,66 +73,48 @@ class WardrobeAI {
   };
 
   /**
-   * Calculate color harmony score between two or more colors
+   * Calculate color harmony score across an outfit's items.
+   * Accepts an array of item objects (preferred) or color-name strings (legacy).
    */
-  static calculateColorHarmony(colors) {
-    if (colors.length < 2) return 100;
+  static calculateColorHarmony(itemsOrColors) {
+    if (itemsOrColors.length < 2) return 100;
+
+    // Detect whether caller passed item objects or plain strings
+    const areItems = itemsOrColors.every(x => x && typeof x === 'object');
 
     let totalScore = 0;
     let comparisons = 0;
 
-    for (let i = 0; i < colors.length; i++) {
-      for (let j = i + 1; j < colors.length; j++) {
-        const color1 = this.normalizeColor(colors[i]);
-        const color2 = this.normalizeColor(colors[j]);
-        const score = this.getColorCompatibilityScore(color1, color2);
+    for (let i = 0; i < itemsOrColors.length; i++) {
+      for (let j = i + 1; j < itemsOrColors.length; j++) {
+        let score;
+        if (areItems) {
+          const reasons = [];
+          score = this.getColorPairHarmony(itemsOrColors[i], itemsOrColors[j], reasons);
+        } else {
+          // Legacy path: color name strings — use colorWheel lookup
+          const c1 = this.normalizeColor(itemsOrColors[i]);
+          const c2 = this.normalizeColor(itemsOrColors[j]);
+          const i1 = this.colorWheel[c1];
+          const i2 = this.colorWheel[c2];
+          if (!i1 || !i2) { score = 50; }
+          else if (i1.universal || i2.universal) { score = 100; }
+          else if (i1.complementary === c2 || i2.complementary === c1) { score = 95; }
+          else if (i1.analogous?.includes(c2) || i2.analogous?.includes(c1)) { score = 85; }
+          else if (i1.temperature === i2.temperature) { score = 70; }
+          else { score = 45; }
+        }
         totalScore += score;
         comparisons++;
       }
     }
 
-    // Penalize too many colors beyond the limit
-    if (colors.length > this.fashionRules.maxColors) {
-      const penalty = (colors.length - this.fashionRules.maxColors) * 15;
+    if (itemsOrColors.length > this.fashionRules.maxColors) {
+      const penalty = (itemsOrColors.length - this.fashionRules.maxColors) * 15;
       totalScore -= penalty * comparisons;
     }
 
     return Math.max(0, Math.min(100, totalScore / comparisons));
-  }
-
-  /**
-   * Get compatibility score between two colors
-   */
-  static getColorCompatibilityScore(color1, color2) {
-    if (!this.colorWheel[color1] || !this.colorWheel[color2]) {
-      return 50; // Unknown colors get neutral score
-    }
-
-    const info1 = this.colorWheel[color1];
-    const info2 = this.colorWheel[color2];
-
-    // Universal colors (neutrals) go with everything
-    if (info1.universal || info2.universal) {
-      return 100;
-    }
-
-    // Complementary colors - highest score
-    if (info1.complementary === color2 || info2.complementary === color1) {
-      return 95;
-    }
-
-    // Analogous colors - good score
-    if (info1.analogous?.includes(color2) || info2.analogous?.includes(color1)) {
-      return 85;
-    }
-
-    // Same temperature - decent score
-    if (info1.temperature === info2.temperature) {
-      return 70;
-    }
-
-    // Different temperatures - lower score but still wearable
-    return 45;
   }
 
   /**
@@ -518,11 +502,19 @@ class WardrobeAI {
       item.occasion ? item.occasion : ['everyday']
     );
 
-    const colorHarmony = this.calculateColorHarmony(colors);
+    // Pass items directly so calculateColorHarmony can use HSL hex-based scoring
+    const colorHarmony = this.calculateColorHarmony(outfitItems);
     const styleConsistency = this.calculateStyleConsistency(styles);
     const patternCompatibility = this.checkPatternCompatibility(patterns);
     const seasonalScore = season ? this.calculateSeasonality(itemSeasons, season) : 100;
     const versatilityScore = this.calculateVersatility(occasions);
+
+    // Bonus when items share AI matchTags (they were analyzed as complementary)
+    const allTags = outfitItems.flatMap(i => i.matching?.matchTags || []);
+    const tagCounts = {};
+    for (const t of allTags) tagCounts[t] = (tagCounts[t] || 0) + 1;
+    const sharedTagCount = Object.values(tagCounts).filter(c => c > 1).length;
+    const matchTagBonus = Math.min(sharedTagCount * 3, 10);
 
     // Weighted average
     const weights = {
@@ -538,7 +530,8 @@ class WardrobeAI {
       styleConsistency * weights.styleConsistency +
       patternCompatibility * weights.patternCompatibility +
       seasonalScore * weights.seasonality +
-      versatilityScore * weights.versatility;
+      versatilityScore * weights.versatility +
+      matchTagBonus;
 
     return {
       overallMatch: Math.round(overallMatch),
@@ -551,29 +544,82 @@ class WardrobeAI {
   }
 
   /**
-   * Find matching items for a given item
+   * Find matching items for a given item.
+   * Consumes stored AI matching data (colorHarmony, pairsWellWith, outfitRole)
+   * before falling back to HSL computation.
    */
-  static findMatchesForItem(item, wardrobeItems, limit = 3) {
+  static findMatchesForItem(item, wardrobeItems, limit = 3, userPrefs = null) {
     const matches = [];
+    const bodyProfile = userPrefs?.bodyProfile || null;
+
+    // Pre-compute avoid list from both directions
+    const itemAvoid = item.matching?.pairsWellWith?.avoid || [];
 
     wardrobeItems.forEach(wardrobeItem => {
       if (wardrobeItem._id && item._id && wardrobeItem._id.toString() === item._id.toString()) return;
       if (wardrobeItem.isAvailable === false) return;
 
+      // Hard filter: item's own avoid list mentions this candidate's color/type
+      const candidateColor = wardrobeItem.color?.primary?.name || '';
+      const candidateType = wardrobeItem.identity?.type || wardrobeItem.category || '';
+      const isAvoided = itemAvoid.some(a =>
+        candidateColor.toLowerCase().includes(a.toLowerCase()) ||
+        candidateType.toLowerCase().includes(a.toLowerCase())
+      );
+      if (isAvoided) return;
+
       const reasons = [];
-      const colorScore = this.getColorPairHarmony(item, wardrobeItem, reasons);
+      let colorScore;
+
+      // Use stored AI colorHarmony if available
+      const aiHarmony = item.matching?.colorHarmony;
+      if (aiHarmony) {
+        const cName = candidateColor.toLowerCase();
+        if (aiHarmony.neutral_safe) {
+          colorScore = 85;
+          reasons.push('AI: neutral-safe pairing');
+        } else if (aiHarmony.clashes?.some(c => c.toLowerCase() === cName)) {
+          colorScore = 10;
+          reasons.push('AI: color clash detected');
+        } else if (aiHarmony.complementary?.some(c => c.toLowerCase() === cName)) {
+          colorScore = 95;
+          reasons.push('AI: complementary color match');
+        } else {
+          colorScore = this.getColorPairHarmony(item, wardrobeItem, reasons);
+        }
+      } else {
+        colorScore = this.getColorPairHarmony(item, wardrobeItem, reasons);
+      }
+
+      // Bonus if candidate appears in AI pairsWellWith for its category
+      const pairsWell = item.matching?.pairsWellWith || {};
+      const normCat = normalizeCategory(wardrobeItem.category, wardrobeItem.identity?.type);
+      const categoryPairs = pairsWell[normCat] || pairsWell.footwear || [];
+      const pairsBonus = categoryPairs.some(p =>
+        candidateType.toLowerCase().includes(p.toLowerCase()) ||
+        candidateColor.toLowerCase().includes(p.toLowerCase())
+      ) ? 8 : 0;
+      if (pairsBonus) reasons.push('AI: recommended pairing');
+
       const patternScore = this.getPatternPairScore(item, wardrobeItem, reasons);
       const seasonScore = this.getSeasonPairScore(item, wardrobeItem, reasons);
 
-      // We weight Color 60% and Season 40% (base 100), then add/subtract the pattern bonus/penalty
-      let finalScore = (colorScore * 0.6) + (seasonScore * 0.4) + patternScore;
-      finalScore = Math.max(0, Math.min(100, Math.round(finalScore)));
-
-      if (reasons.length === 0) {
-        reasons.push("Pieces coordinate well");
+      // Light body-profile nudge
+      let profileBonus = 0;
+      if (bodyProfile) {
+        if (bodyProfile.skinUndertone && wardrobeItem.color?.primary?.undertone) {
+          if (bodyProfile.skinUndertone === wardrobeItem.color.primary.undertone) profileBonus += 4;
+        }
+        if (bodyProfile.fitPreference && wardrobeItem.fit?.fit_type) {
+          if (bodyProfile.fitPreference === wardrobeItem.fit.fit_type) profileBonus += 3;
+        }
       }
 
-      // Resolve color name and hex from either new AI formats or legacy format
+      let finalScore = (colorScore * 0.6) + (seasonScore * 0.4) + patternScore + pairsBonus + profileBonus;
+      finalScore = Math.max(0, Math.min(100, Math.round(finalScore)));
+
+      if (reasons.length === 0) reasons.push('Pieces coordinate well');
+
       const colorName = wardrobeItem.color?.primary?.name || wardrobeItem.colorAnalysis?.primary?.name || wardrobeItem.colorName || wardrobeItem.colors?.[0]?.name || 'Unknown';
       const colorHex = wardrobeItem.color?.primary?.hex || wardrobeItem.colorAnalysis?.primary?.hex || wardrobeItem.colorHex || wardrobeItem.colors?.[0]?.hex || '#000000';
 
@@ -585,7 +631,6 @@ class WardrobeAI {
         colorHex,
         matchScore: finalScore,
         matchReasons: reasons,
-        // Keep these for backward compatibility with `generateShoppingCombinations`
         item: wardrobeItem,
         score: finalScore,
         breakdown: { overallMatch: finalScore }
@@ -634,10 +679,14 @@ class WardrobeAI {
       kurta: ['bottoms', 'shoes', 'accessories']
     };
 
-    const targetCategories = categoryMapping[newItem.category] || ['tops', 'bottoms', 'shoes', 'accessories'];
+    const normNewCat = normalizeCategory(newItem.category, newItem.identity?.type);
+    const targetCategories = categoryMapping[normNewCat] || ['tops', 'bottoms', 'shoes', 'accessories'];
 
     targetCategories.forEach(category => {
-      const categoryItems = filteredWardrobe.filter(item => item.category === category);
+      // Normalize at read-time (defense-in-depth for legacy docs)
+      const categoryItems = filteredWardrobe.filter(item =>
+        normalizeCategory(item.category, item.identity?.type) === category
+      );
       const matches = this.findMatchesForItem(newItem, categoryItems, 5);
 
       matches.forEach(match => {
@@ -735,11 +784,19 @@ class WardrobeAI {
       season = 'all-season',
       occasion = 'everyday',
       style = null,
-      limit = 10
+      timeOfDay = null,
+      limit = 10,
+      userPrefs = null
     } = options;
 
     // Filter items by criteria
     let filteredItems = wardrobeItems.filter(item => item.isAvailable !== false);
+
+    if (timeOfDay && timeOfDay !== 'both') {
+      filteredItems = filteredItems.filter(item =>
+        !item.timeOfDay || item.timeOfDay === 'both' || item.timeOfDay === timeOfDay
+      );
+    }
 
     if (season !== 'all-season') {
       filteredItems = filteredItems.filter(item => {
@@ -766,18 +823,19 @@ class WardrobeAI {
     const suggestions = [];
     const generatedCombinations = new Set();
 
-    // Group items by category - expanded for global clothing categories
+    // Group items by normalized category (defense-in-depth for legacy docs)
+    const norm = i => normalizeCategory(i.category, i.identity?.type);
     const byCategory = {
-      tops: filteredItems.filter(i => i.category === 'tops'),
-      bottoms: filteredItems.filter(i => i.category === 'bottoms'),
-      shoes: filteredItems.filter(i => i.category === 'shoes'),
-      dresses: filteredItems.filter(i => i.category === 'dresses'),
-      outerwear: filteredItems.filter(i => i.category === 'outerwear'),
-      accessories: filteredItems.filter(i => i.category === 'accessories'),
-      traditional: filteredItems.filter(i => i.category === 'traditional' || i.category === 'ethnic'),
-      sarees: filteredItems.filter(i => i.category === 'sarees' || i.identity?.type === 'sari' || i.identity?.type === 'saree'),
-      lehenga: filteredItems.filter(i => i.category === 'lehenga'),
-      kurta: filteredItems.filter(i => i.category === 'kurta')
+      tops: filteredItems.filter(i => norm(i) === 'tops'),
+      bottoms: filteredItems.filter(i => norm(i) === 'bottoms'),
+      shoes: filteredItems.filter(i => norm(i) === 'shoes'),
+      dresses: filteredItems.filter(i => norm(i) === 'dresses'),
+      outerwear: filteredItems.filter(i => norm(i) === 'outerwear'),
+      accessories: filteredItems.filter(i => norm(i) === 'accessories'),
+      traditional: filteredItems.filter(i => norm(i) === 'traditional'),
+      sarees: filteredItems.filter(i => norm(i) === 'sarees'),
+      lehenga: filteredItems.filter(i => norm(i) === 'lehenga'),
+      kurta: filteredItems.filter(i => norm(i) === 'kurta'),
     };
 
     // Generate dress-based outfits (includes traditional/ethnic one-piece garments)
@@ -830,7 +888,8 @@ class WardrobeAI {
           const topShoes = this.findMatchesForItem(
             { ...top, category: top.category || 'tops' },
             byCategory.shoes.slice(0, 5),
-            1
+            1,
+            userPrefs
           );
 
           if (topShoes.length > 0) {
@@ -876,6 +935,19 @@ class WardrobeAI {
         }
       }
     });
+
+    // Light body-profile nudge: prefer outfits that contain items matching user undertone/fit
+    const bodyProfile = userPrefs?.bodyProfile || null;
+    if (bodyProfile) {
+      suggestions.forEach(s => {
+        let boost = 0;
+        s.items.forEach(item => {
+          if (bodyProfile.skinUndertone && item.color?.primary?.undertone === bodyProfile.skinUndertone) boost += 2;
+          if (bodyProfile.fitPreference && item.fit?.fit_type === bodyProfile.fitPreference) boost += 2;
+        });
+        s.score = Math.min(100, s.score + boost);
+      });
+    }
 
     return suggestions
       .sort((a, b) => b.score - a.score)

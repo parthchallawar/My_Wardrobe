@@ -3,6 +3,7 @@ const Item = require('../models/Item');
 const Outfit = require('../models/Outfit');
 const WardrobeAI = require('../utils/wardrobeAI');
 const authMiddleware = require('../middleware/auth');
+const WearLog = require('../models/WearLog');
 
 const router = express.Router();
 
@@ -245,6 +246,17 @@ router.post('/:id/wear', authMiddleware, async (req, res) => {
     await outfit.save();
     await outfit.populate('items.item');
 
+    // Create WearLog entry for history/calendar
+    const { timeOfDay, occasion, notes, date } = req.body || {};
+    await WearLog.create({
+      user: req.user.id,
+      outfit: outfit._id,
+      date: date ? new Date(date) : outfit.lastWorn,
+      timeOfDay: timeOfDay || 'both',
+      occasion: occasion || null,
+      notes: notes || null,
+    });
+
     res.json({ outfit, message: 'Wear recorded' });
   } catch (error) {
     console.error('Record wear error:', error);
@@ -259,7 +271,7 @@ router.post('/:id/wear', authMiddleware, async (req, res) => {
  */
 router.post('/generate', authMiddleware, async (req, res) => {
   try {
-    const { season, occasion, style, limit = 10 } = req.body;
+    const { season, occasion, style, timeOfDay, limit = 10 } = req.body;
 
     // Get all user items
     const wardrobeItems = await Item.find({ user: req.user.id, isAvailable: true });
@@ -268,11 +280,14 @@ router.post('/generate', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Need at least 2 items in your wardrobe to generate outfits' });
     }
 
+    const user = await require('../models/User').findById(req.user.id).select('preferences').lean();
     const options = {
       season: season || 'all-season',
       occasion: occasion || 'everyday',
       style,
-      limit
+      timeOfDay: timeOfDay || null,
+      limit,
+      userPrefs: user?.preferences || null
     };
 
     const suggestions = WardrobeAI.generateOutfitSuggestions(wardrobeItems, options);
@@ -321,7 +336,8 @@ router.post('/generate', authMiddleware, async (req, res) => {
           seasonality: safeNum(bd.seasonality, 100),
           versatility: safeNum(bd.versatility, 75)
         },
-        generatedBy: 'ai'
+        generatedBy: 'ai',
+        timeOfDay: options.timeOfDay || 'both'
       };
     });
 

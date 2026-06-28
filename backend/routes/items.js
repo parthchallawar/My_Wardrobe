@@ -6,6 +6,8 @@ const WardrobeAI = require('../utils/wardrobeAI');
 const authMiddleware = require('../middleware/auth');
 const { handleUpload, handleMultipleUpload, deleteImages } = require('../middleware/upload');
 const { detectColors, detectColorsFromMultipleImages } = require('../utils/colorDetection');
+const { normalizeCategory } = require('../utils/categoryNormalizer');
+const WearLog = require('../models/WearLog');
 
 const router = express.Router();
 
@@ -56,9 +58,16 @@ function mergeAiData(itemData) {
         : aiDataObj.matching;
     }
 
-    // Auto-populate top-level fields from AI analysis if not explicitly provided
+    // Auto-populate top-level fields from AI analysis if not explicitly provided.
+    // Always normalize category to the canonical vocabulary so engine buckets work.
     if (aiDataObj.identity?.category && !itemData.category) {
-      itemData.category = aiDataObj.identity.category;
+      itemData.category = normalizeCategory(
+        aiDataObj.identity.category,
+        aiDataObj.identity.type
+      );
+    } else if (itemData.category) {
+      // Normalize even user-supplied values (guards against stale/messy data)
+      itemData.category = normalizeCategory(itemData.category, aiDataObj.identity?.type);
     }
     if (aiDataObj.identity?.subCategory && !itemData.subCategory) {
       itemData.subCategory = aiDataObj.identity.subCategory;
@@ -95,6 +104,21 @@ function mergeAiData(itemData) {
       // Merge AI match tags into item tags if not already present
       if (!itemData.tags || itemData.tags.length === 0) {
         itemData.tags = aiDataObj.matching.matchTags;
+      }
+    }
+
+    // Derive timeOfDay from formalityScore + occasion
+    if (!itemData.timeOfDay || itemData.timeOfDay === 'both') {
+      const formality = aiDataObj.styling?.formalityScore;
+      const occasions = (aiDataObj.styling?.occasion || []).map(o => o.toLowerCase());
+      const nightOccasions = ['party', 'date', 'formal', 'gala', 'evening'];
+      const dayOccasions = ['everyday', 'work', 'sport', 'casual', 'school'];
+      if (formality >= 7 || occasions.some(o => nightOccasions.includes(o))) {
+        itemData.timeOfDay = 'night';
+      } else if (formality <= 4 || occasions.some(o => dayOccasions.includes(o))) {
+        itemData.timeOfDay = 'day';
+      } else {
+        itemData.timeOfDay = 'both';
       }
     }
 
@@ -225,21 +249,27 @@ router.post('/with-image', authMiddleware, handleUpload, async (req, res) => {
     delete itemData.color;
     delete itemData.colors;
 
-    // Add image if uploaded (Cloudinary stores it in req.file)
+    // Add image if uploaded (Cloudinary URL or base64 data URL from enrichFile)
     if (req.file) {
       itemData.images = [{
-        url: req.file.path, // Cloudinary URL
-        publicId: req.file.filename, // Cloudinary public ID
+        url: req.file.url || req.file.path,
+        publicId: req.file.publicId || req.file.filename,
+        thumbnailUrl: req.file.thumbnailUrl || req.file.url || req.file.path,
         isPrimary: true,
         width: req.file.width,
         height: req.file.height,
         format: req.file.format,
-        bytes: req.file.size
+        bytes: req.file.size || req.file.bytes,
       }];
+      // Store imageUrl for backward compat; avoid writing imageBase64 for Cloudinary uploads
+      itemData.imageUrl = req.file.url || req.file.path;
+      if (!req.file._cloudinary) {
+        itemData.imageBase64 = req.file.path; // only for base64 fallback
+      }
 
-      // Auto-detect colors from uploaded image
+      // Auto-detect colors from buffer (works for both Cloudinary & base64 paths)
       try {
-        const detectedColors = await detectColors(req.file.path, 5);
+        const detectedColors = await detectColors(req.file.buffer || req.file.path, 5);
         itemData.colors = detectedColors;
       } catch (colorError) {
         console.error('Color detection error:', colorError.message);
@@ -319,22 +349,27 @@ router.post('/with-images', authMiddleware, handleMultipleUpload, async (req, re
     delete itemData.color;
     delete itemData.colors;
 
-    // Add images if uploaded (Cloudinary stores them in req.files)
+    // Add images if uploaded (Cloudinary URL or base64 data URL from enrichFile)
     if (req.files && req.files.length > 0) {
       itemData.images = req.files.map((file, index) => ({
-        url: file.path, // Cloudinary URL
-        publicId: file.filename, // Cloudinary public ID
-        isPrimary: index === 0, // First image is primary by default
+        url: file.url || file.path,
+        publicId: file.publicId || file.filename,
+        thumbnailUrl: file.thumbnailUrl || file.url || file.path,
+        isPrimary: index === 0,
         width: file.width,
         height: file.height,
         format: file.format,
-        bytes: file.size
+        bytes: file.size || file.bytes,
       }));
+      itemData.imageUrl = req.files[0].url || req.files[0].path;
+      if (!req.files[0]._cloudinary) {
+        itemData.imageBase64 = req.files[0].path;
+      }
 
-      // Auto-detect colors from uploaded images
+      // Auto-detect colors using buffers (works for both Cloudinary & base64 paths)
       try {
-        const imageUrls = req.files.map(file => file.path);
-        const detectedColors = await detectColorsFromMultipleImages(imageUrls, 5);
+        const sources = req.files.map(f => f.buffer || f.path);
+        const detectedColors = await detectColorsFromMultipleImages(sources, 5);
         itemData.colors = detectedColors;
       } catch (colorError) {
         console.error('Color detection error:', colorError.message);
@@ -724,9 +759,21 @@ router.post('/:id/wear', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
+    const wornAt = new Date();
     item.wearCount = item.wearCount + 1;
-    item.lastWorn = new Date();
+    item.lastWorn = wornAt;
     await item.save();
+
+    // Create WearLog entry for history/calendar
+    const { timeOfDay, occasion, notes, date } = req.body || {};
+    await WearLog.create({
+      user: req.user.id,
+      item: item._id,
+      date: date ? new Date(date) : wornAt,
+      timeOfDay: timeOfDay || 'both',
+      occasion: occasion || null,
+      notes: notes || null,
+    });
 
     res.json({ item, message: 'Wear recorded successfully' });
   } catch (error) {

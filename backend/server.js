@@ -14,6 +14,7 @@ const outfitRoutes = require('./routes/outfits');
 const aiRoutes = require('./routes/ai');
 const userRoutes = require('./routes/users');
 const analyzeRoute = require('./routes/analyze');
+const wearLogRoutes = require('./routes/wearlog');
 
 // Import middleware
 const { errorHandler } = require('./middleware/errorHandler');
@@ -64,6 +65,7 @@ app.use('/api/outfits', outfitRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/analyze', analyzeRoute);
+app.use('/api/wearlog', wearLogRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

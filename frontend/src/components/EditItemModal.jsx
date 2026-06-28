@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from 'react-query';
 import axios from 'axios';
 import { itemsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
+import { CATEGORIES, STYLES, SEASONS } from '../constants/taxonomy';
 
 const EditItemModal = ({ isOpen, onClose, item }) => {
   const queryClient = useQueryClient();
@@ -40,6 +41,7 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
     season: '',
     tags: '',
     notes: '',
+    timeOfDay: 'both',
   });
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -56,6 +58,7 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
         season: item.season?.[0] || '',
         tags: item.tags?.join(', ') || '',
         notes: item.notes || '',
+        timeOfDay: item.timeOfDay || 'both',
       });
       if (item.images?.[0]?.url) {
         setPreviewUrl(getImageUrl(item.images[0].url));
@@ -88,6 +91,7 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
       season: formData.season || undefined,
       tags: formData.tags || undefined,
       notes: formData.notes || undefined,
+      timeOfDay: formData.timeOfDay || 'both',
     };
 
     if (selectedFile) {
@@ -108,6 +112,7 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
       if (itemData.season) formData.append('season', itemData.season);
       if (itemData.tags) formData.append('tags', itemData.tags);
       if (itemData.notes) formData.append('notes', itemData.notes);
+      formData.append('timeOfDay', itemData.timeOfDay || 'both');
       formData.append('image', selectedFile);
 
       axios.put(
@@ -140,6 +145,7 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
         season: itemData.season ? [itemData.season] : undefined,
         tags: itemData.tags ? itemData.tags.split(',').map(tag => tag.trim()) : [],
         notes: itemData.notes,
+        timeOfDay: itemData.timeOfDay,
       };
       updateMutation.mutate({ id: item._id, data: finalData });
     }
@@ -185,6 +191,7 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
       season: '',
       tags: '',
       notes: '',
+      timeOfDay: 'both',
     });
     setSelectedFile(null);
     setPreviewUrl(null);
@@ -259,12 +266,9 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
                 className="input-primary w-full"
               >
                 <option value="">Select category</option>
-                <option value="tops">Tops</option>
-                <option value="bottoms">Bottoms</option>
-                <option value="shoes">Shoes</option>
-                <option value="accessories">Accessories</option>
-                <option value="outerwear">Outerwear</option>
-                <option value="dresses">Dresses</option>
+                {CATEGORIES.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
               </select>
             </div>
 
@@ -280,14 +284,9 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
                 className="input-primary w-full"
               >
                 <option value="">Select style</option>
-                <option value="casual">Casual</option>
-                <option value="formal">Formal</option>
-                <option value="sporty">Sporty</option>
-                <option value="bohemian">Bohemian</option>
-                <option value="minimalist">Minimalist</option>
-                <option value="vintage">Vintage</option>
-                <option value="streetwear">Streetwear</option>
-                <option value="glam">Glam</option>
+                {STYLES.map(s => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
               </select>
             </div>
 
@@ -338,11 +337,25 @@ const EditItemModal = ({ isOpen, onClose, item }) => {
                 className="input-primary w-full"
               >
                 <option value="">Select season</option>
-                <option value="spring">Spring</option>
-                <option value="summer">Summer</option>
-                <option value="fall">Fall</option>
-                <option value="winter">Winter</option>
-                <option value="all-season">All Seasons</option>
+                {SEASONS.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Wear Time */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Wear Time
+              </label>
+              <select
+                value={formData.timeOfDay}
+                onChange={(e) => setFormData({ ...formData, timeOfDay: e.target.value })}
+                className="input-primary w-full"
+              >
+                <option value="both">Any time</option>
+                <option value="day">Day</option>
+                <option value="night">Night</option>
               </select>
             </div>
 

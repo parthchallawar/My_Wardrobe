@@ -12,29 +12,12 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { aiAPI } from '@/services/api';
+import { CATEGORIES, STYLES, SEASONS, COLORS } from '@/constants/taxonomy';
 
-const colorOptions = [
-  'black', 'white', 'gray', 'navy', 'beige', 'brown',
-  'red', 'blue', 'green', 'yellow', 'pink', 'purple',
-  'orange', 'burgundy', 'emerald', 'teal', 'khaki', 'olive'
-];
-
-const categoryOptions = [
-  { value: 'tops', label: 'Tops' },
-  { value: 'bottoms', label: 'Bottoms' },
-  { value: 'shoes', label: 'Shoes' },
-  { value: 'accessories', label: 'Accessories' },
-  { value: 'outerwear', label: 'Outerwear' },
-  { value: 'dresses', label: 'Dresses' }
-];
-
-const styleOptions = [
-  'casual', 'formal', 'sporty', 'bohemian', 'minimalist', 'vintage', 'streetwear', 'glam'
-];
-
-const seasonOptions = [
-  'spring', 'summer', 'fall', 'winter', 'all-season'
-];
+const colorOptions = COLORS;
+const categoryOptions = CATEGORIES;
+const styleOptions = STYLES;
+const seasonOptions = SEASONS.map(s => s.value);
 
 const ShopMatch = () => {
   const navigate = useNavigate();
@@ -377,11 +360,13 @@ const ShopMatch = () => {
                                 </div>
 
                                 {match.whyItWorks?.length > 0 && (
-                                  <div className="mt-2 p-3 rounded-lg bg-black-700/50">
-                                    <p className="text-sm text-gray-300">
-                                      <Info className="w-3 h-3 inline mr-1 text-neon-green" />
-                                      {match.whyItWorks[0]}
-                                    </p>
+                                  <div className="mt-2 p-3 rounded-lg bg-black-700/50 space-y-1">
+                                    {match.whyItWorks.map((reason, ri) => (
+                                      <p key={ri} className="text-sm text-gray-300 flex items-start gap-1.5">
+                                        <Info className="w-3 h-3 mt-0.5 flex-shrink-0 text-neon-green" />
+                                        {reason}
+                                      </p>
+                                    ))}
                                   </div>
                                 )}
                               </div>

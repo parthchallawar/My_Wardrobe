@@ -54,6 +54,7 @@ const outfitSchema = new mongoose.Schema({
     enum: ['ai', 'user', 'hybrid'],
     default: 'ai'
   },
+  timeOfDay: { type: String, enum: ['day', 'night', 'both'], default: 'both' },
   isFavorite: { type: Boolean, default: false },
   wornCount: { type: Number, default: 0 },
   lastWorn: { type: Date, default: null },

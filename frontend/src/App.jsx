@@ -13,6 +13,7 @@ import Outfits from './pages/Outfits';
 import ShopMatch from './pages/ShopMatch';
 import Insights from './pages/Insights';
 import Settings from './pages/Settings';
+import WearCalendar from './pages/WearCalendar';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -224,6 +225,23 @@ function App() {
                       >
                         <ProtectedRoute>
                           <Settings />
+                        </ProtectedRoute>
+                      </motion.div>
+                    }
+                  />
+                  <Route
+                    path="/calendar"
+                    element={
+                      <motion.div
+                        key="calendar"
+                        variants={pageVariants}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        transition={pageTransition}
+                      >
+                        <ProtectedRoute>
+                          <WearCalendar />
                         </ProtectedRoute>
                       </motion.div>
                     }

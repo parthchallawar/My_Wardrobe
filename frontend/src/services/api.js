@@ -37,13 +37,21 @@ const createFormDataMultiple = (data, files) => {
 // Helper function to get full image URL (Cloudinary URLs don't need transformation)
 export const getImageUrl = (imageUrl) => {
   if (!imageUrl) return null;
-  // Cloudinary URLs and base64 data URIs are full URLs, just return as is
   if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:')) {
     return imageUrl;
   }
-  // Fallback for relative URLs
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   return `${API_BASE_URL}${imageUrl}`;
+};
+
+/**
+ * Returns the best thumbnail URL for an item — prefers the Cloudinary thumbnail,
+ * falls back to the full image. Used in list/grid views to avoid loading full images.
+ */
+export const getThumbUrl = (item) => {
+  if (!item) return null;
+  const thumb = item.images?.[0]?.thumbnailUrl || item.images?.[0]?.url || item.imageUrl || item.imageBase64;
+  return getImageUrl(thumb);
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -155,6 +163,14 @@ export const usersAPI = {
   getPreferences: () => api.get('/users/preferences'),
   updateProfile: (data) => api.put('/users/profile', data),
   deleteAccount: () => api.delete('/users/account'),
+};
+
+// WearLog API
+export const wearLogAPI = {
+  log: (data) => api.post('/wearlog', data),
+  getRange: (params) => api.get('/wearlog', { params }),
+  getRotation: (params) => api.get('/wearlog/rotation', { params }),
+  delete: (id) => api.delete(`/wearlog/${id}`),
 };
 
 export default api;

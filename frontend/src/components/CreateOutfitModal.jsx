@@ -4,12 +4,7 @@ import { X, Shirt, Plus, Check } from 'lucide-react';
 import { useQuery, useQueryClient } from 'react-query';
 import { itemsAPI, outfitsAPI, getImageUrl } from '@/services/api';
 import toast from 'react-hot-toast';
-
-const CATEGORY_TO_TYPE = {
-  tops: 'top', bottoms: 'bottom', shoes: 'shoes',
-  accessories: 'accessory', outerwear: 'layer', dresses: 'dress',
-  traditional: 'top', kurta: 'top', sarees: 'dress', lehenga: 'dress',
-};
+import { CATEGORY_TO_TYPE } from '@/constants/taxonomy';
 
 const CreateOutfitModal = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient();

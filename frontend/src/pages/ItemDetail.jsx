@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Edit, Trash2, Heart, Shirt, Tag,
-  Ruler, Palette, Layers, Box, CheckCircle2, AlertTriangle, Activity
+  Ruler, Palette, Layers, Box, CheckCircle2, AlertTriangle, Activity, Calendar,
+  Sun, Moon
 } from 'lucide-react';
-import { itemsAPI, getImageUrl } from '../services/api';
+import { itemsAPI, getImageUrl, wearLogAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import EditItemModal from '@/components/EditItemModal';
 
@@ -88,6 +89,18 @@ export default function ItemDetail() {
     }
   };
 
+  const handleWoreToday = async () => {
+    try {
+      await wearLogAPI.log({ item: id, date: new Date().toISOString(), timeOfDay: 'both' });
+      // Refresh item to show updated wearCount
+      const response = await itemsAPI.getById(id);
+      setItem(response.data.item);
+      toast.success('Wear logged!');
+    } catch (error) {
+      toast.error('Failed to log wear');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[60vh]">
@@ -121,6 +134,14 @@ export default function ItemDetail() {
             }`}
           >
             <Heart className={`w-5 h-5 ${item.isFavorite ? 'fill-current' : ''}`} />
+          </button>
+          <button
+            onClick={handleWoreToday}
+            title="Log a wear for today"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl glass border-gray-700 text-gray-400 hover:text-neon-green hover:border-neon-green/50 transition-all text-sm"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Wore today</span>
           </button>
           <button onClick={() => setIsEditModalOpen(true)} className="p-2.5 rounded-xl glass border-gray-700 text-gray-400 hover:text-neon-green hover:border-neon-green/50 transition-all">
             <Edit className="w-5 h-5" />
@@ -178,13 +199,23 @@ export default function ItemDetail() {
 
           <div className="glass p-6 rounded-3xl border border-gray-700">
             <h1 className="text-3xl font-bold text-white mb-2">{safeRender(item.name)}</h1>
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
               <span className="px-3 py-1 bg-neon-green/10 text-neon-green border border-neon-green/20 rounded-full text-sm font-medium uppercase tracking-wider">
                 {safeRender(item.category)}
               </span>
               {item.subCategory && (
                 <span className="px-3 py-1 bg-gray-800 text-gray-300 border border-gray-700 rounded-full text-sm font-medium uppercase tracking-wider">
                   {safeRender(item.subCategory)}
+                </span>
+              )}
+              {item.timeOfDay && item.timeOfDay !== 'both' && (
+                <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${
+                  item.timeOfDay === 'day'
+                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
+                    : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                }`}>
+                  {item.timeOfDay === 'day' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                  {item.timeOfDay.charAt(0).toUpperCase() + item.timeOfDay.slice(1)}
                 </span>
               )}
             </div>
@@ -265,24 +296,71 @@ export default function ItemDetail() {
           </div>
 
           {/* AI Matching Recommendations */}
-          {item.matching?.matchTags?.length > 0 && (
-            <motion.div 
+          {(item.matching?.matchTags?.length > 0 || item.matching?.pairsWellWith || item.matching?.colorHarmony) && (
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="glass p-6 rounded-3xl border border-neon-green/20"
+              className="glass p-6 rounded-3xl border border-neon-green/20 space-y-5"
             >
-              <div className="flex items-center gap-2 mb-4 text-neon-green">
+              <div className="flex items-center gap-2 text-neon-green">
                 <CheckCircle2 className="w-5 h-5" />
-                <h3 className="font-semibold text-lg tracking-wide uppercase">AI Synergy Tags</h3>
+                <h3 className="font-semibold text-lg tracking-wide uppercase">AI Pairing Intelligence</h3>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {(Array.isArray(item.matching?.matchTags) ? item.matching.matchTags : []).map((tag, i) => (
-                  <span key={i} className="px-4 py-2 bg-black-800 text-gray-300 rounded-xl text-sm border border-gray-700 hover:border-neon-green/50 hover:text-neon-green transition-colors cursor-default">
-                    {safeRender(tag)}
-                  </span>
-                ))}
-              </div>
+
+              {item.matching?.matchTags?.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Synergy Tags</p>
+                  <div className="flex flex-wrap gap-2">
+                    {item.matching.matchTags.map((tag, i) => (
+                      <span key={i} className="px-3 py-1.5 bg-black-800 text-gray-300 rounded-xl text-sm border border-gray-700 hover:border-neon-green/50 hover:text-neon-green transition-colors cursor-default">
+                        {safeRender(tag)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {item.matching?.colorHarmony?.complementary?.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Complementary Colors</p>
+                  <div className="flex flex-wrap gap-2">
+                    {item.matching.colorHarmony.complementary.map((c, i) => (
+                      <span key={i} className="px-3 py-1.5 bg-neon-green/10 text-neon-green rounded-xl text-sm border border-neon-green/30 capitalize">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {item.matching?.colorHarmony?.clashes?.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Color Clashes to Avoid</p>
+                  <div className="flex flex-wrap gap-2">
+                    {item.matching.colorHarmony.clashes.map((c, i) => (
+                      <span key={i} className="px-3 py-1.5 bg-red-900/20 text-red-400 rounded-xl text-sm border border-red-700/30 capitalize">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {item.matching?.pairsWellWith && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Pairs Well With</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['bottoms', 'outerwear', 'footwear'].flatMap(cat =>
+                      (item.matching.pairsWellWith[cat] || []).map((v, i) => (
+                        <span key={`${cat}-${i}`} className="px-3 py-1.5 bg-black-800 text-gray-300 rounded-xl text-sm border border-gray-700 capitalize">
+                          {v}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 

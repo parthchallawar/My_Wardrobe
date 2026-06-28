@@ -9,8 +9,10 @@ import {
   Trash2,
   Wand2,
   Calendar,
+  Sun,
+  Moon,
 } from 'lucide-react';
-import { outfitsAPI } from '@/services/api';
+import { outfitsAPI, getThumbUrl } from '@/services/api';
 import toast from 'react-hot-toast';
 import CreateOutfitModal from '@/components/CreateOutfitModal';
 
@@ -19,6 +21,7 @@ const Outfits = () => {
   const queryClient = useQueryClient();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [timeOfDay, setTimeOfDay] = useState('both');
   const { data, isLoading, refetch } = useQuery(
     'outfits',
     () => outfitsAPI.getAll(),
@@ -30,7 +33,7 @@ const Outfits = () => {
   const handleGenerateOutfit = async () => {
     setIsGenerating(true);
     try {
-      await outfitsAPI.generate({ limit: 5 });
+      await outfitsAPI.generate({ limit: 5, timeOfDay: timeOfDay === 'both' ? undefined : timeOfDay });
       toast.success('New outfits generated!');
       refetch();
     } catch (error) {
@@ -67,6 +70,28 @@ const Outfits = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Day / Night toggle */}
+          <div className="flex items-center rounded-lg border border-gray-700 overflow-hidden">
+            {[
+              { value: 'day', icon: Sun, label: 'Day' },
+              { value: 'both', icon: null, label: 'All' },
+              { value: 'night', icon: Moon, label: 'Night' },
+            ].map(({ value, icon: Icon, label }) => (
+              <button
+                key={value}
+                onClick={() => setTimeOfDay(value)}
+                className={`flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
+                  timeOfDay === value
+                    ? 'bg-neon-green/20 text-neon-green'
+                    : 'text-gray-400 hover:text-white hover:bg-black-700'
+                }`}
+              >
+                {Icon && <Icon className="w-3.5 h-3.5" />}
+                {label}
+              </button>
+            ))}
+          </div>
+
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -151,10 +176,10 @@ const Outfits = () => {
                         key={i}
                         className="relative rounded-lg bg-black-700 overflow-hidden"
                       >
-                        {item.item?.images?.[0]?.url ? (
+                        {getThumbUrl(item.item) ? (
                           <img
-                            src={item.item.images[0].url}
-                            alt={item.item.name}
+                            src={getThumbUrl(item.item)}
+                            alt={item.item?.name}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -182,6 +207,17 @@ const Outfits = () => {
                 <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-neon-green/90 text-black-800 text-xs font-bold">
                   {outfit.aiScore?.overallMatch || 0}% Match
                 </div>
+
+                {/* Day/Night Badge */}
+                {outfit.timeOfDay && outfit.timeOfDay !== 'both' && (
+                  <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full bg-black/70 backdrop-blur-sm border border-gray-600/50">
+                    {outfit.timeOfDay === 'day'
+                      ? <Sun className="w-3 h-3 text-yellow-400" />
+                      : <Moon className="w-3 h-3 text-indigo-400" />
+                    }
+                    <span className="text-[10px] text-gray-300 capitalize">{outfit.timeOfDay}</span>
+                  </div>
+                )}
               </div>
 
               {/* Outfit Info */}

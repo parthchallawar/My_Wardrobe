@@ -100,9 +100,12 @@ router.post('/match-items', authMiddleware, async (req, res) => {
       isAvailable: true
     });
 
+    const user = await require('../models/User').findById(req.user.id).select('preferences').lean();
+    const userPrefs = user?.preferences || null;
+
     const matches = targetItems.map(targetItem => ({
       targetItem,
-      matches: WardrobeAI.findMatchesForItem(targetItem, wardrobeItems, limit)
+      matches: WardrobeAI.findMatchesForItem(targetItem, wardrobeItems, limit, userPrefs)
     }));
 
     res.json({ matches });

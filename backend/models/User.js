@@ -34,7 +34,16 @@ const userSchema = new mongoose.Schema({
     seasons: [{
       type: String,
       enum: ['spring', 'summer', 'fall', 'winter']
-    }]
+    }],
+    bodyProfile: {
+      skinUndertone: { type: String, enum: ['warm', 'cool', 'neutral', null], default: null },
+      fitPreference: { type: String, enum: ['slim', 'regular', 'relaxed', null], default: null },
+      sizes: {
+        top: { type: String, default: null },
+        bottom: { type: String, default: null },
+        shoe: { type: String, default: null }
+      }
+    }
   },
   wardrobeStats: {
     totalItems: { type: Number, default: 0 },

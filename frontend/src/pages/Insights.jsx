@@ -11,6 +11,7 @@ import {
   ArrowUp,
   ArrowDown,
   Sparkles,
+  RefreshCcw,
 } from 'lucide-react';
 import {
   BarChart,
@@ -24,7 +25,7 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { aiAPI, itemsAPI } from '@/services/api';
+import { aiAPI, itemsAPI, wearLogAPI, getThumbUrl } from '@/services/api';
 
 const COLORS = ['#39FF14', '#5CFF3D', '#2EE012', '#00FF66', '#1a1a1a'];
 
@@ -41,8 +42,15 @@ const Insights = () => {
     { enabled: !!localStorage.getItem('wardrobe-ai-storage') }
   );
 
+  const { data: rotationData } = useQuery(
+    'wearlog-rotation',
+    () => wearLogAPI.getRotation({ limit: 8 }),
+    { staleTime: 5 * 60 * 1000 }
+  );
+
   const insights = insightsData?.data?.insights;
   const stats = statsData?.data;
+  const neglected = rotationData?.data?.items || [];
 
   if (insightsLoading) {
     return (
@@ -301,9 +309,9 @@ const Insights = () => {
                       className="flex items-center gap-4 p-3 rounded-lg bg-black-600"
                     >
                       <div className="w-12 h-12 rounded-lg bg-black-700 overflow-hidden">
-                        {item.images?.[0]?.url ? (
+                        {getThumbUrl(item) ? (
                           <img
-                            src={item.images[0].url}
+                            src={getThumbUrl(item)}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -342,9 +350,9 @@ const Insights = () => {
                       className="flex items-center gap-4 p-3 rounded-lg bg-black-600"
                     >
                       <div className="w-12 h-12 rounded-lg bg-black-700 overflow-hidden">
-                        {item.images?.[0]?.url ? (
+                        {getThumbUrl(item) ? (
                           <img
-                            src={item.images[0].url}
+                            src={getThumbUrl(item)}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -367,6 +375,53 @@ const Insights = () => {
                 </div>
               </motion.div>
             </div>
+          )}
+
+          {/* Neglected / Rotation Section */}
+          {neglected.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card p-6 border border-yellow-600/30"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-xl bg-yellow-500/10">
+                  <RefreshCcw className="w-5 h-5 text-yellow-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Time to Rotate</h2>
+                  <p className="text-sm text-gray-500">Items you haven't worn recently — give them some love</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {neglected.map((item) => (
+                  <div
+                    key={item._id}
+                    className="flex items-center gap-3 p-3 bg-black-700/50 rounded-xl border border-gray-700 hover:border-yellow-600/40 transition-colors"
+                  >
+                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-black-800">
+                      {getThumbUrl(item) ? (
+                        <img
+                          src={getThumbUrl(item)}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Shirt className="w-5 h-5 text-gray-600" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{item.name}</p>
+                      <p className="text-xs text-yellow-500">
+                        {item.daysSinceWorn !== null ? `${item.daysSinceWorn}d ago` : 'Never worn'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
           )}
         </>
       )}

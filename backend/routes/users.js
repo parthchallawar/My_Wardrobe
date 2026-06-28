@@ -11,7 +11,7 @@ const router = express.Router();
  */
 router.put('/preferences', authMiddleware, async (req, res) => {
   try {
-    const { stylePreferences, preferredColors, avoidColors, seasons } = req.body;
+    const { stylePreferences, preferredColors, avoidColors, seasons, bodyProfile } = req.body;
 
     const user = await User.findById(req.user.id);
 
@@ -23,7 +23,8 @@ router.put('/preferences', authMiddleware, async (req, res) => {
       stylePreferences: stylePreferences || user.preferences.stylePreferences,
       preferredColors: preferredColors || user.preferences.preferredColors,
       avoidColors: avoidColors || user.preferences.avoidColors,
-      seasons: seasons || user.preferences.seasons
+      seasons: seasons || user.preferences.seasons,
+      bodyProfile: bodyProfile !== undefined ? bodyProfile : (user.preferences.bodyProfile || {})
     };
 
     await user.save();

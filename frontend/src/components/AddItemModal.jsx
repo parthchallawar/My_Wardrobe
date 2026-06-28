@@ -6,6 +6,8 @@ import { useDropzone } from 'react-dropzone';
 import { itemsAPI, aiAPI } from '@/services/api';
 import toast from 'react-hot-toast';
 import { extractDominantColor } from '../utils/colorExtractor';
+import { normalizeCategory } from '../utils/normalizeCategory';
+import { CATEGORIES, STYLES, SEASONS } from '../constants/taxonomy';
 
 const AddItemModal = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient();
@@ -33,6 +35,7 @@ const AddItemModal = ({ isOpen, onClose }) => {
     brand: '',
     season: '',
     tags: '',
+    timeOfDay: 'both',
   });
 
   const addMutation = useMutation(
@@ -89,16 +92,24 @@ const AddItemModal = ({ isOpen, onClose }) => {
       const pattern = typeof fullData.pattern === 'object' ? (fullData.pattern?.type || '') : (fullData.pattern || 'solid');
       const season = Array.isArray(fullData.styling?.season) ? (fullData.styling.season[0] || '') : (fullData.styling?.season || fullData.season || 'all-season');
 
-      let categoryMap = 'tops';
-      const typeLower = type.toLowerCase();
-      if (['t-shirt', 'shirt', 'sweater', 'vest', 'graphic tee', 'top', 'blouse'].includes(typeLower)) categoryMap = 'tops';
-      else if (['jacket', 'coat', 'bomber', 'denim jacket', 'hoodie', 'blazer', 'cardigan'].includes(typeLower)) categoryMap = 'outerwear';
-      else if (['pants', 'shorts', 'skirt', 'joggers', 'cargo pants', 'jeans', 'bottoms'].includes(typeLower)) categoryMap = 'bottoms';
-      else if (['dress', 'jumpsuit', 'romper'].includes(typeLower)) categoryMap = 'dresses';
-      else if (['shoes', 'sneakers', 'slides', 'boots', 'heels', 'sandals'].includes(typeLower)) categoryMap = 'shoes';
-      else if (['bag', 'hat', 'scarf', 'belt', 'accessory', 'jewelry', 'sunglasses'].includes(typeLower)) categoryMap = 'accessories';
+      const categoryMap = normalizeCategory(
+        fullData.identity?.category || '',
+        type
+      );
 
       const finalName = type ? `My ${type}`.replace(/\b\w/g, l => l.toUpperCase()) : 'New Outfit Item';
+
+      // Derive timeOfDay from AI formalityScore + occasion
+      const deriveTimeOfDay = (aiData) => {
+        const formality = aiData.styling?.formalityScore;
+        const occasions = (aiData.styling?.occasion || []).map(o => o.toLowerCase());
+        const nightOcc = ['party', 'date', 'formal', 'gala', 'evening'];
+        const dayOcc = ['everyday', 'work', 'sport', 'casual', 'school'];
+        if (formality >= 7 || occasions.some(o => nightOcc.includes(o))) return 'night';
+        if (formality <= 4 || occasions.some(o => dayOcc.includes(o))) return 'day';
+        return 'both';
+      };
+      const derivedTimeOfDay = deriveTimeOfDay(fullData);
 
       const img = new Image();
       img.onload = async () => {
@@ -113,6 +124,7 @@ const AddItemModal = ({ isOpen, onClose }) => {
           colorName: colorResult.name,
           brand: fullData.brand || '',
           tags: fullData.styling?.occasion ? fullData.styling.occasion.join(', ') : '',
+          timeOfDay: derivedTimeOfDay,
         });
         setIsAiPrefilled(true);
         setIsAnalyzing(false);
@@ -129,6 +141,7 @@ const AddItemModal = ({ isOpen, onClose }) => {
           colorName: 'Unknown',
           brand: fullData.brand || '',
           tags: fullData.styling?.occasion ? fullData.styling.occasion.join(', ') : '',
+          timeOfDay: derivedTimeOfDay,
         });
         setIsAiPrefilled(true);
         setIsAnalyzing(false);
@@ -163,6 +176,7 @@ const AddItemModal = ({ isOpen, onClose }) => {
       brand: formData.brand || undefined,
       season: formData.season || undefined,
       tags: formData.tags || undefined,
+      timeOfDay: formData.timeOfDay || 'both',
       aiAnalyzed: isAiPrefilled,
     };
 
@@ -185,7 +199,7 @@ const AddItemModal = ({ isOpen, onClose }) => {
 
   const handleClose = () => {
     setFormData({
-      name: '', category: '', style: '', color: '#000000', colorName: '', pattern: 'solid', brand: '', season: '', tags: '',
+      name: '', category: '', style: '', color: '#000000', colorName: '', pattern: 'solid', brand: '', season: '', tags: '', timeOfDay: 'both',
     });
     setPreviewUrl(null);
     setSelectedFile(null);
@@ -358,12 +372,9 @@ const AddItemModal = ({ isOpen, onClose }) => {
                     className="w-full bg-black-600 border border-gray-700 text-white rounded-xl p-3 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all appearance-none"
                   >
                     <option value="">Select...</option>
-                    <option value="tops">Tops</option>
-                    <option value="bottoms">Bottoms</option>
-                    <option value="shoes">Shoes</option>
-                    <option value="accessories">Accessories</option>
-                    <option value="outerwear">Outerwear</option>
-                    <option value="dresses">Dresses</option>
+                    {CATEGORIES.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -376,14 +387,9 @@ const AddItemModal = ({ isOpen, onClose }) => {
                     className="w-full bg-black-600 border border-gray-700 text-white rounded-xl p-3 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all appearance-none"
                   >
                     <option value="">Select...</option>
-                    <option value="casual">Casual</option>
-                    <option value="formal">Formal</option>
-                    <option value="sporty">Sporty</option>
-                    <option value="bohemian">Bohemian</option>
-                    <option value="minimalist">Minimalist</option>
-                    <option value="vintage">Vintage</option>
-                    <option value="streetwear">Streetwear</option>
-                    <option value="glam">Glam</option>
+                    {STYLES.map(s => (
+                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -424,11 +430,9 @@ const AddItemModal = ({ isOpen, onClose }) => {
                     className="w-full bg-black-600 border border-gray-700 text-white rounded-xl p-3 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all appearance-none"
                   >
                     <option value="">Select...</option>
-                    <option value="spring">Spring</option>
-                    <option value="summer">Summer</option>
-                    <option value="fall">Fall</option>
-                    <option value="winter">Winter</option>
-                    <option value="all-season">All Seasons</option>
+                    {SEASONS.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
                   </select>
                 </div>
                 
@@ -440,6 +444,19 @@ const AddItemModal = ({ isOpen, onClose }) => {
                     onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
                     className="w-full bg-black-600 border border-gray-700 text-white rounded-xl p-3 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Wear Time</label>
+                  <select
+                    value={formData.timeOfDay}
+                    onChange={(e) => setFormData({ ...formData, timeOfDay: e.target.value })}
+                    className="w-full bg-black-600 border border-gray-700 text-white rounded-xl p-3 focus:border-neon-green focus:ring-1 focus:ring-neon-green transition-all appearance-none"
+                  >
+                    <option value="both">Any time</option>
+                    <option value="day">Day</option>
+                    <option value="night">Night</option>
+                  </select>
                 </div>
 
                 <div className="col-span-2">
