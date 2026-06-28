@@ -10,10 +10,20 @@ import {
   Plus,
   RefreshCw,
   ShoppingCart,
+  Sun,
+  Sunset,
+  Moon,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/store/useStore';
-import { itemsAPI, outfitsAPI, aiAPI } from '@/services/api';
+import { itemsAPI, outfitsAPI, aiAPI, getThumbUrl } from '@/services/api';
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return { text: 'Good morning', Icon: Sun };
+  if (hour < 18) return { text: 'Good afternoon', Icon: Sunset };
+  return { text: 'Good evening', Icon: Moon };
+};
 
 const StatCard = ({ title, value, icon: Icon, color, trend }) => (
   <motion.div
@@ -76,21 +86,30 @@ const QuickAction = ({ icon: Icon, label, onClick, color }) => (
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useStore();
+  const greeting = getGreeting();
 
-  const { data: stats, isLoading: statsLoading } = useQuery(
+  const { data: stats } = useQuery(
     'wardrobe-stats',
     () => itemsAPI.getStatistics(),
     { enabled: !!localStorage.getItem('wardrobe-ai-storage') }
   );
 
-  const { data: insights, isLoading: insightsLoading } = useQuery(
+  const { data: insights } = useQuery(
     'style-insights',
     () => aiAPI.getStyleInsights(),
     { enabled: !!localStorage.getItem('wardrobe-ai-storage') }
   );
 
+  const { data: itemsData } = useQuery(
+    'wardrobe-items',
+    () => itemsAPI.getAll(),
+    { enabled: !!localStorage.getItem('wardrobe-ai-storage') }
+  );
+
   const wardrobeStats = stats?.data?.summary || { totalItems: 0, totalWears: 0, favorites: 0 };
   const styleInsights = insights?.data?.insights;
+  const recentItems = (itemsData?.data?.items || []).slice(-5).reverse();
 
   return (
     <div className="space-y-6">
@@ -98,13 +117,17 @@ const Dashboard = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex items-start justify-between"
       >
         <div>
-          <h1 className="text-3xl font-display font-bold text-white mb-2">
-            Welcome back! 👋
+          <div className="flex items-center gap-2 mb-1">
+            <greeting.Icon className="w-5 h-5 text-neon-green/70" />
+            <span className="text-sm text-gray-500 font-medium">{greeting.text}</span>
+          </div>
+          <h1 className="text-3xl font-display font-bold text-white leading-tight">
+            {user?.username ? `${user.username}'s Wardrobe` : 'My Wardrobe'}
           </h1>
-          <p className="text-gray-400">Your AI-powered wardrobe assistant</p>
+          <p className="text-gray-500 text-sm mt-1">AI-powered style at your fingertips</p>
         </div>
 
         <motion.button
@@ -113,7 +136,7 @@ const Dashboard = () => {
           onClick={() => navigate('/shop-match')}
           className="btn-primary flex items-center gap-2"
         >
-          <ShoppingCart className="w-5 h-5" />
+          <ShoppingCart className="w-4 h-4" />
           Shop Match
         </motion.button>
       </motion.div>
@@ -262,6 +285,52 @@ const Dashboard = () => {
               </p>
             </div>
           )}
+        </motion.div>
+      )}
+
+      {/* Recently Added */}
+      {recentItems.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="card p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-white">Recently Added</h2>
+            <button
+              onClick={() => navigate('/wardrobe')}
+              className="text-neon-green hover:text-neon-greenLight transition-colors text-sm flex items-center gap-1"
+            >
+              View all <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+            {recentItems.map((item) => (
+              <motion.div
+                key={item._id}
+                whileHover={{ scale: 1.03, y: -3 }}
+                onClick={() => navigate(`/wardrobe/${item._id}`)}
+                className="flex-shrink-0 w-28 cursor-pointer group"
+              >
+                <div className="w-28 h-36 rounded-xl overflow-hidden bg-black-700 border border-gray-700/50 group-hover:border-neon-green/40 transition-all duration-300">
+                  {getThumbUrl(item) ? (
+                    <img
+                      src={getThumbUrl(item)}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Shirt className="w-8 h-8 text-gray-600" />
+                    </div>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-gray-400 truncate group-hover:text-neon-green transition-colors">{item.name}</p>
+                <p className="text-[10px] text-gray-600 uppercase tracking-wide">{item.category}</p>
+              </motion.div>
+            ))}
+          </div>
         </motion.div>
       )}
     </div>

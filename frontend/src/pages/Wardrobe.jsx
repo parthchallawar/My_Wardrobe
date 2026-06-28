@@ -20,11 +20,23 @@ import toast from 'react-hot-toast';
 import AddItemModal from '@/components/AddItemModal';
 import EditItemModal from '@/components/EditItemModal';
 
+const CATEGORY_FILTERS = [
+  { label: 'All', value: '' },
+  { label: 'Tops', value: 'tops' },
+  { label: 'Bottoms', value: 'bottoms' },
+  { label: 'Shoes', value: 'shoes' },
+  { label: 'Dresses', value: 'dresses' },
+  { label: 'Outerwear', value: 'outerwear' },
+  { label: 'Accessories', value: 'accessories' },
+  { label: 'Traditional', value: 'traditional' },
+];
+
 const Wardrobe = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const { data, isLoading } = useQuery(
@@ -36,9 +48,11 @@ const Wardrobe = () => {
   const items = data?.data?.items || [];
   const getColorValue = (color) => color?.hex || color?.primary || color?.value || '#000000';
 
-  const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = !selectedCategory || item.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   if (isLoading) {
     return (
@@ -120,6 +134,34 @@ const Wardrobe = () => {
           </motion.button>
         </div>
       </motion.div>
+
+      {/* Category filter chips */}
+      {items.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex gap-2 overflow-x-auto scrollbar-hide pb-1"
+        >
+          {CATEGORY_FILTERS.map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => setSelectedCategory(cat.value)}
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
+                selectedCategory === cat.value
+                  ? 'bg-neon-green text-black-800 border-neon-green shadow-neon-sm'
+                  : 'bg-transparent text-gray-400 border-gray-700 hover:border-neon-green/50 hover:text-neon-green'
+              }`}
+            >
+              {cat.label}
+              {cat.value && (
+                <span className={`ml-1.5 text-xs ${selectedCategory === cat.value ? 'text-black-800/70' : 'text-gray-600'}`}>
+                  {items.filter(i => i.category === cat.value).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </motion.div>
+      )}
 
       {/* Empty State */}
       {items.length === 0 ? (

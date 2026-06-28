@@ -1,13 +1,24 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { User, LogOut, Menu, ShoppingCart, Sparkles } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { User, LogOut, Menu, Sparkles } from 'lucide-react';
 import { useStore } from '@/store/useStore';
-import { authAPI } from '@/services/api';
+
+const PAGE_TITLES = {
+  '/': 'Dashboard',
+  '/wardrobe': 'My Wardrobe',
+  '/outfits': 'Outfits',
+  '/shop-match': 'Shop Match',
+  '/calendar': 'Wear Calendar',
+  '/insights': 'Insights',
+  '/settings': 'Settings',
+};
 
 const Header = ({ onMenuClick }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, token, logout } = useStore();
+  const pageTitle = PAGE_TITLES[location.pathname] || 'StyleAI';
 
   const handleLogout = async () => {
     try {
@@ -26,77 +37,49 @@ const Header = ({ onMenuClick }) => {
     >
       <div className="flex items-center justify-between">
         {/* Left section */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <motion.button
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.9 }}
             onClick={onMenuClick}
             className="p-2 rounded-lg hover:bg-black-700 transition-colors"
           >
-            <Menu className="w-6 h-6 text-neon-green" />
+            <Menu className="w-5 h-5 text-gray-400" />
           </motion.button>
 
-          {/* Logo */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            onClick={() => navigate('/')}
-            className="flex items-center gap-3 cursor-pointer"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-neon-green to-neon-greenLight flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-black-800" />
-            </div>
-            <div>
-              <h1 className="text-xl font-display font-bold bg-clip-text text-transparent bg-gradient-to-r from-neon-green via-neon-greenLight to-neon-green">
-                StyleAI
-              </h1>
-              <p className="text-xs text-gray-400">Wardrobe Assistant</p>
-            </div>
-          </motion.div>
+          <div className="h-5 w-px bg-gray-700/50" />
+
+          <h2 className="text-base font-semibold text-gray-200">{pageTitle}</h2>
         </div>
 
-        {/* Center navigation */}
-        <nav className="hidden md:flex items-center gap-6">
-          {[
-            { path: '/wardrobe', label: 'Wardrobe', icon: null },
-            { path: '/outfits', label: 'Outfits', icon: null },
-            { path: '/shop-match', label: 'Shop Match', icon: ShoppingCart },
-            { path: '/insights', label: 'Insights', icon: null },
-          ].map((item) => (
-            <motion.button
-              key={item.path}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate(item.path)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-300 hover:text-neon-green hover:bg-black-700/50 transition-all"
-            >
-              {item.icon && <item.icon className="w-4 h-4" />}
-              {item.label}
-            </motion.button>
-          ))}
-        </nav>
-
         {/* Right section */}
-        <div className="flex items-center gap-4">
-          <motion.div
+        <div className="flex items-center gap-3">
+          <motion.button
             whileHover={{ scale: 1.05 }}
-            className="flex items-center gap-3 px-4 py-2 rounded-lg bg-black-700/50 border border-gray-700 hover:border-neon-green/50 transition-all"
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/')}
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black-700/50 border border-gray-700/50 hover:border-neon-green/30 transition-all"
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-neon-green to-neon-greenLight flex items-center justify-center">
-              <User className="w-5 h-5 text-black-800" />
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-neon-green to-neon-greenLight flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-black-800" />
             </div>
-            <div className="hidden sm:block">
-              <p className="text-sm font-medium text-gray-200">{user?.username}</p>
-              <p className="text-xs text-gray-400 capitalize">{user?.subscription?.plan || 'Free'}</p>
+            <span className="text-sm font-display font-bold text-neon-green">StyleAI</span>
+          </motion.button>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black-700/50 border border-gray-700/50">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-neon-green to-neon-greenLight flex items-center justify-center">
+              <User className="w-3.5 h-3.5 text-black-800" />
             </div>
-          </motion.div>
+            <span className="hidden sm:block text-sm font-medium text-gray-300">{user?.username}</span>
+          </div>
 
           <motion.button
-            whileHover={{ scale: 1.1, rotate: 90 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleLogout}
-            className="p-2 rounded-lg hover:bg-black-700 transition-colors text-gray-400 hover:text-red-400"
+            className="p-2 rounded-lg hover:bg-red-500/10 transition-colors text-gray-500 hover:text-red-400"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4" />
           </motion.button>
         </div>
       </div>
