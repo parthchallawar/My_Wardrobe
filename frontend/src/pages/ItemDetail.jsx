@@ -19,21 +19,37 @@ const safeRender = (val) => {
 };
 
 const DetailSection = ({ title, icon: Icon, children, className = '' }) => (
-  <motion.div 
+  <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className={`glass p-6 rounded-2xl border border-gray-700/50 hover:border-neon-green/30 transition-colors ${className}`}
+    className={`rounded-2xl bg-gradient-to-b from-black-700/70 to-black-800/80 border border-gray-800 hover:border-neon-green/30 transition-colors overflow-hidden ${className}`}
   >
-    <div className="flex items-center gap-2 mb-4 text-neon-green">
-      {Icon && <Icon className="w-5 h-5" />}
-      <h3 className="font-semibold text-lg tracking-wide uppercase">{title}</h3>
+    <div className="flex items-center gap-3 px-5 pt-5 pb-4">
+      <div className="w-9 h-9 rounded-xl bg-neon-green/10 border border-neon-green/25 flex items-center justify-center flex-shrink-0">
+        {Icon && <Icon className="w-[18px] h-[18px] text-neon-green" />}
+      </div>
+      <h3 className="font-bold text-sm tracking-wider uppercase text-white">{title}</h3>
     </div>
-    <div className="space-y-3">
+    <div className="px-5 pb-5 grid grid-cols-2 gap-2.5">
       {children}
     </div>
   </motion.div>
 );
 
+// Compact stat tile: small uppercase label over a bold value.
+const StatTile = ({ label, value, full = false }) => {
+  if (value == null || value === '') return null;
+  return (
+    <div className={`rounded-xl bg-black-900/50 border border-gray-800 px-3 py-2.5 ${full ? 'col-span-2' : ''}`}>
+      <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-sm font-semibold text-white capitalize leading-tight truncate" title={safeRender(value)}>
+        {safeRender(value)}
+      </p>
+    </div>
+  );
+};
+
+// Left-column simple row (kept for the primary info card).
 const DetailRow = ({ label, value }) => {
   if (value == null || value === '') return null;
   return (
@@ -242,50 +258,61 @@ export default function ItemDetail() {
             {/* Color & Pattern */}
             <DetailSection title="Color & Pattern" icon={Palette}>
               {item.color?.primary && (
-                <div className="flex items-center gap-3 py-2">
-                  <div 
-                    className="w-8 h-8 rounded-full shadow-inner border border-gray-600/50"
+                <div className="col-span-2 flex items-center gap-3 rounded-xl bg-black-900/50 border border-gray-800 px-3 py-3">
+                  <div
+                    className="w-11 h-11 rounded-lg shadow-inner border border-gray-600/60 flex-shrink-0"
                     style={{ backgroundColor: item.color.primary.hex || item.colorHex || '#ccc' }}
                   />
-                  <div>
-                    <p className="text-white font-medium capitalize">{safeRender(item.color.primary.name || item.colorName)}</p>
-                    <p className="text-xs text-gray-500">{safeRender(item.color.primary.hex || item.colorHex)}</p>
+                  <div className="min-w-0">
+                    <p className="text-white font-semibold capitalize truncate">{safeRender(item.color.primary.name || item.colorName)}</p>
+                    <p className="text-xs text-gray-500 font-mono uppercase">{safeRender(item.color.primary.hex || item.colorHex)}</p>
                   </div>
                 </div>
               )}
-              {item.pattern?.type && <DetailRow label="Pattern Type" value={item.pattern.type} />}
-              {item.pattern?.scale && <DetailRow label="Pattern Scale" value={item.pattern.scale} />}
-              {item.color?.colorTemperature && <DetailRow label="Temperature" value={item.color.colorTemperature} />}
+              <StatTile label="Pattern" value={item.pattern?.type} />
+              <StatTile label="Pattern Scale" value={item.pattern?.scale} />
+              <StatTile label="Temperature" value={item.color?.colorTemperature} />
             </DetailSection>
 
             {/* Fit & Silhouette */}
             <DetailSection title="Fit & Silhouette" icon={Box}>
-              <DetailRow label="Fit Type" value={item.fit?.fit_type} />
-              <DetailRow label="Silhouette" value={item.fit?.silhouette} />
-              <DetailRow label="Length" value={item.dimensions?.length} />
-              <DetailRow label="Neckline" value={item.dimensions?.neckline} />
+              <StatTile label="Fit Type" value={item.fit?.fit_type} />
+              <StatTile label="Silhouette" value={item.fit?.silhouette} />
+              <StatTile label="Length" value={item.dimensions?.length} />
+              <StatTile label="Neckline" value={item.dimensions?.neckline} />
             </DetailSection>
 
             {/* Construction & Fabric */}
             <DetailSection title="Construction" icon={Layers}>
-              <DetailRow label="Fabric" value={item.construction?.fabric} />
-              <DetailRow label="Texture" value={item.construction?.texture} />
-              <DetailRow label="Sleeve Length" value={item.dimensions?.sleeve} />
-              <DetailRow label="Stretch" value={item.construction?.stretch} />
+              <StatTile label="Fabric" value={item.construction?.fabric} />
+              <StatTile label="Texture" value={item.construction?.texture} />
+              <StatTile label="Sleeve" value={item.dimensions?.sleeve} />
+              <StatTile label="Stretch" value={item.construction?.stretch} />
             </DetailSection>
 
             {/* Styling & Condition */}
             <DetailSection title="Styling & Diagnostics" icon={Tag}>
-              <DetailRow label="Style" value={item.styling?.style} />
-              <DetailRow label="Formality Score" value={item.styling?.formalityScore ? `${item.styling.formalityScore}/10` : null} />
-              <DetailRow label="Aesthetic" value={Array.isArray(item.styling?.aesthetic) ? item.styling.aesthetic.join(', ') : item.styling?.aesthetic} />
+              <StatTile label="Style" value={item.styling?.style} />
+              <StatTile label="Formality" value={item.styling?.formalityScore ? `${item.styling.formalityScore}/10` : null} />
+              {(Array.isArray(item.styling?.aesthetic) ? item.styling.aesthetic.length > 0 : item.styling?.aesthetic) && (
+                <div className="col-span-2 rounded-xl bg-black-900/50 border border-gray-800 px-3 py-2.5">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Aesthetic</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Array.isArray(item.styling.aesthetic) ? item.styling.aesthetic : [item.styling.aesthetic]).filter(Boolean).map((a, i) => (
+                      <span key={i} className="text-xs text-neon-green bg-neon-green/10 border border-neon-green/20 px-2 py-0.5 rounded-full capitalize">
+                        {safeRender(a)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               {item.condition && (
-                <div className="mt-4 p-3 bg-black-800/50 rounded-xl border border-gray-700/50 flex items-start gap-3">
+                <div className="col-span-2 p-3 bg-yellow-500/[0.04] rounded-xl border border-yellow-500/20 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-white mb-1">Condition Report</p>
                     <p className="text-xs text-gray-400 capitalize">
-                      Wear: {safeRender(item.condition.estimatedWear || 'Unknown')} | 
+                      Wear: {safeRender(item.condition.estimatedWear || 'Unknown')} ·
                       Care: {safeRender(Array.isArray(item.condition.careSymbols) ? item.condition.careSymbols.join(', ') : item.condition.careSymbols || 'None')}
                     </p>
                   </div>
