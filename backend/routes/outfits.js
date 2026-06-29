@@ -271,7 +271,7 @@ router.post('/:id/wear', authMiddleware, async (req, res) => {
  */
 router.post('/generate', authMiddleware, async (req, res) => {
   try {
-    const { season, occasion, style, timeOfDay, limit = 10 } = req.body;
+    const { season, occasion, style, timeOfDay, limit = 12 } = req.body;
 
     // Get all user items
     const wardrobeItems = await Item.find({ user: req.user.id, isAvailable: true });
@@ -334,12 +334,19 @@ router.post('/generate', authMiddleware, async (req, res) => {
           colorHarmony: safeNum(bd.colorHarmony),
           styleConsistency: safeNum(bd.styleConsistency),
           seasonality: safeNum(bd.seasonality, 100),
-          versatility: safeNum(bd.versatility, 75)
+          versatility: safeNum(bd.versatility, 75),
+          trendScore: safeNum(bd.trendScore, 0),
+          bestScore: safeNum(bd.bestScore, 0)
         },
+        trendReasons: Array.isArray(bd.trendReasons) ? bd.trendReasons.slice(0, 4) : [],
         generatedBy: 'ai',
         timeOfDay: options.timeOfDay || 'both'
       };
     });
+
+    // Replace the previous AI-generated batch so the list reflects the latest run
+    // instead of accumulating stale duplicates. User-created/favorited outfits are kept.
+    await Outfit.deleteMany({ user: req.user.id, generatedBy: 'ai', isFavorite: { $ne: true } });
 
     // Save generated outfits to DB so they appear in the outfits list
     const savedOutfits = await Outfit.insertMany(

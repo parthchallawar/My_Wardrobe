@@ -314,6 +314,131 @@ class WardrobeAI {
   }
 
   /**
+   * "Best" priority score for a single item (0-100). Combines four signals the user
+   * cares about so standout pieces get featured and anchored in generated outfits:
+   *   - isFavorite (their explicit "best")    → up to +35
+   *   - brand present ("rich"/designer piece) → up to +20
+   *   - AI quality (confidence + versatility) → up to +25
+   *   - least-worn (rotation / hidden gems)   → up to +20
+   */
+  static itemPriority(item) {
+    if (!item) return 0;
+    let score = 0;
+
+    // Favorite — the strongest signal of what the user considers their best
+    if (item.isFavorite) score += 35;
+
+    // Branded / designer = "rich" clothing
+    if (item.brand && String(item.brand).trim()) score += 20;
+
+    // AI quality: overall analysis confidence (0-1) + stored versatility (0-100)
+    const confidence = Number(item.confidence?.overall) || 0; // 0..1
+    const versatility = Number(item.matching?.versatilityScore) || 0; // 0..100
+    score += Math.min(15, confidence * 15);
+    score += Math.min(10, (versatility / 100) * 10);
+
+    // Least-worn gems: fewer wears => higher boost (decays after ~10 wears)
+    const wears = Number(item.wearCount) || 0;
+    score += Math.max(0, 20 - Math.min(20, wears * 2));
+
+    return Math.round(Math.max(0, Math.min(100, score)));
+  }
+
+  /**
+   * Aggregate "best" score for a whole outfit — blends the strongest piece with the
+   * overall quality so an outfit built around a standout item ranks higher.
+   */
+  static calculateBestScore(items) {
+    if (!items || items.length === 0) return 0;
+    const priorities = items.map(i => this.itemPriority(i));
+    const max = Math.max(...priorities);
+    const avg = priorities.reduce((a, b) => a + b, 0) / priorities.length;
+    return Math.round(max * 0.6 + avg * 0.4);
+  }
+
+  // Trend tags considered "on-trend" / Gen-Z right now. Matched against each item's
+  // styling.trend, styling.aesthetic and matching.matchTags (all lowercased).
+  static trendyTags = new Set([
+    'y2k', 'streetwear', 'gorpcore', 'quiet luxury', 'old money', 'coastal',
+    'athleisure', 'sport-luxe', 'utility', 'workwear', 'grunge revival',
+    'tonal dressing', 'monochrome', 'earthy tones', 'minimal', 'minimalist',
+    'oversized', 'baggy', 'wide-leg', 'cargo', 'double denim', 'preppy'
+  ]);
+
+  /**
+   * Trend score for an outfit (0-100) combining a curated current-trend ruleset with
+   * the AI trend/aesthetic tags already stored on each item. Returns { score, reasons }.
+   */
+  static calculateTrendScore(items) {
+    if (!items || items.length < 2) return { score: 50, reasons: [] };
+    const reasons = [];
+    let score = 40; // neutral baseline
+
+    const lc = v => String(v || '').toLowerCase();
+    const fitType = i => lc(i.fit?.fit_type || i.fit?.silhouette);
+    const fabric = i => lc(i.construction?.fabric || i.fabric);
+    const style = i => lc(i.styling?.style || i.style);
+
+    const tops = items.filter(i => ['tops', 'kurta'].includes(normalizeCategory(i.category, i.identity?.type)));
+    const bottoms = items.filter(i => normalizeCategory(i.category, i.identity?.type) === 'bottoms');
+    const shoes = items.filter(i => normalizeCategory(i.category, i.identity?.type) === 'shoes');
+
+    // --- Curated rules ---
+    // Oversized/relaxed top + slim/tapered bottom (the defining Gen-Z proportion play)
+    const looseTop = tops.some(t => ['oversized', 'relaxed', 'loose', 'wide'].some(k => fitType(t).includes(k)));
+    const slimBottom = bottoms.some(b => ['slim', 'tapered', 'fitted', 'skinny'].some(k => fitType(b).includes(k)));
+    if (looseTop && slimBottom) { score += 22; reasons.push('Oversized top + fitted bottom proportion'); }
+
+    // Wide-leg / baggy bottoms are very on-trend
+    if (bottoms.some(b => ['wide', 'relaxed', 'baggy', 'loose'].some(k => fitType(b).includes(k)))) {
+      score += 10; reasons.push('Relaxed wide-leg bottoms');
+    }
+
+    // Double denim
+    if (tops.some(t => fabric(t).includes('denim')) && bottoms.some(b => fabric(b).includes('denim'))) {
+      score += 12; reasons.push('Double denim');
+    }
+
+    // Monochrome / tonal — all pieces neutral or share a color family
+    const families = items.map(i => lc(i.color?.primary?.family || i.color?.dominantFamily)).filter(Boolean);
+    const allNeutral = items.every(i => this.isNeutralColor(i.color?.primary?.hex, i.color?.primary?.name));
+    if (allNeutral) { score += 12; reasons.push('Tonal neutral palette'); }
+    else if (families.length >= 2 && new Set(families).size === 1) { score += 12; reasons.push('Monochrome / tonal dressing'); }
+
+    // Athleisure / sport-luxe: sporty piece + sneakers
+    if (items.some(i => ['sporty', 'streetwear'].includes(style(i))) &&
+        shoes.some(s => ['sneaker', 'trainer'].some(k => lc(s.subCategory || s.name).includes(k)))) {
+      score += 8; reasons.push('Athleisure / sport-luxe');
+    }
+
+    // --- AI tags ---
+    const tagsPerItem = items.map(i => {
+      const t = [
+        ...(Array.isArray(i.styling?.trend) ? i.styling.trend : []),
+        ...(Array.isArray(i.styling?.aesthetic) ? i.styling.aesthetic : []),
+        ...(Array.isArray(i.matching?.matchTags) ? i.matching.matchTags : []),
+      ].map(lc);
+      return new Set(t);
+    });
+
+    // Known-trendy tags present anywhere
+    const allTags = tagsPerItem.flatMap(s => [...s]);
+    const trendyHits = new Set(allTags.filter(t => this.trendyTags.has(t)));
+    if (trendyHits.size > 0) {
+      score += Math.min(15, trendyHits.size * 5);
+      reasons.push(`On-trend: ${[...trendyHits].slice(0, 3).join(', ')}`);
+    }
+
+    // Shared aesthetic across pieces = cohesive trend story
+    if (tagsPerItem.length >= 2) {
+      const shared = [...tagsPerItem[0]].filter(t => tagsPerItem.every(s => s.has(t)) && this.trendyTags.has(t));
+      if (shared.length > 0) { score += 8; reasons.push(`Cohesive ${shared[0]} aesthetic`); }
+    }
+
+    return { score: Math.round(Math.max(0, Math.min(100, score))), reasons: [...new Set(reasons)] };
+  }
+
+  /**
    * Helper to convert HEX to HSL
    */
   static hexToHsl(hex) {
@@ -533,13 +658,28 @@ class WardrobeAI {
       versatilityScore * weights.versatility +
       matchTagBonus;
 
+    // "Best" + trend layers (used for ranking; overallMatch stays the compatibility number)
+    const bestScore = this.calculateBestScore(outfitItems);
+    const trend = this.calculateTrendScore(outfitItems);
+
+    const overall = Math.round(Math.max(0, Math.min(100, overallMatch)));
+
+    // Composite ranking score: compatibility still dominates, trend & best lift standouts
+    const rankScore = Math.round(
+      overall * 0.6 + trend.score * 0.25 + bestScore * 0.15
+    );
+
     return {
-      overallMatch: Math.round(overallMatch),
+      overallMatch: overall,
       colorHarmony: Math.round(colorHarmony),
       styleConsistency: Math.round(styleConsistency),
       patternCompatibility,
       seasonality: Math.round(seasonalScore),
-      versatility: Math.round(versatilityScore)
+      versatility: Math.round(versatilityScore),
+      trendScore: trend.score,
+      bestScore,
+      rankScore,
+      trendReasons: trend.reasons
     };
   }
 
@@ -838,14 +978,24 @@ class WardrobeAI {
       kurta: filteredItems.filter(i => norm(i) === 'kurta'),
     };
 
+    // Sort every pool so the user's best pieces (favorites / branded / high-AI-quality /
+    // least-worn) are tried first, then cap for performance. Replaces the old slice(0,8)
+    // truncation that dropped most of the wardrobe by arbitrary insertion order.
+    const CANDIDATE_CAP = 30;
+    for (const key of Object.keys(byCategory)) {
+      byCategory[key] = byCategory[key]
+        .sort((a, b) => this.itemPriority(b) - this.itemPriority(a))
+        .slice(0, CANDIDATE_CAP);
+    }
+
     // Generate dress-based outfits (includes traditional/ethnic one-piece garments)
     const onePieceCategories = [...byCategory.dresses, ...byCategory.sarees, ...byCategory.lehenga];
     if (onePieceCategories.length > 0) {
       onePieceCategories.forEach(dress => {
         const key = `dress-${dress._id}`;
 
-        // Add shoes
-        byCategory.shoes.slice(0, 5).forEach(shoes => {
+        // Add shoes (full sorted pool — best pieces first)
+        byCategory.shoes.forEach(shoes => {
           const keyWithShoes = `${key}-${shoes._id}`;
           if (generatedCombinations.has(keyWithShoes)) return;
 
@@ -877,17 +1027,17 @@ class WardrobeAI {
     // Generate top-bottom combinations (includes kurtas with bottoms)
     const topItems = [...byCategory.tops, ...byCategory.kurta];
     if (topItems.length > 0 && byCategory.bottoms.length > 0) {
-      topItems.slice(0, 8).forEach(top => {
-        byCategory.bottoms.slice(0, 8).forEach(bottom => {
+      topItems.forEach(top => {
+        byCategory.bottoms.forEach(bottom => {
           const key = `${top._id}-${bottom._id}`;
           if (generatedCombinations.has(key)) return;
 
           const items = [top, bottom];
 
-          // Add shoes
+          // Add best-matching shoes from the full sorted pool
           const topShoes = this.findMatchesForItem(
             { ...top, category: top.category || 'tops' },
-            byCategory.shoes.slice(0, 5),
+            byCategory.shoes,
             1,
             userPrefs
           );
@@ -916,11 +1066,13 @@ class WardrobeAI {
       });
     }
 
-    // Add outerwear if appropriate
+    // Add outerwear if appropriate — pick the best-matching layer, not just the first one
     suggestions.forEach(suggestion => {
       if (byCategory.outerwear.length > 0 && ['fall', 'winter', 'all-season'].includes(season)) {
         const baseItems = suggestion.items;
-        const outerwearMatch = byCategory.outerwear[0]; // Simple for now
+        const anchor = baseItems[0];
+        const outerMatches = this.findMatchesForItem(anchor, byCategory.outerwear, 1, userPrefs);
+        const outerwearMatch = outerMatches[0]?.item || byCategory.outerwear[0];
 
         const itemsWithOuter = [...baseItems, outerwearMatch];
         const scores = this.calculateOutfitScore(itemsWithOuter, season, occasion);
@@ -946,12 +1098,59 @@ class WardrobeAI {
           if (bodyProfile.fitPreference && item.fit?.fit_type === bodyProfile.fitPreference) boost += 2;
         });
         s.score = Math.min(100, s.score + boost);
+        if (s.breakdown) {
+          s.breakdown.rankScore = Math.min(100, (s.breakdown.rankScore ?? s.score) + boost);
+        }
       });
     }
 
-    return suggestions
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    // Rank by composite score (compatibility + trend + best), not raw match alone, so
+    // trendy / standout outfits surface first.
+    const rankOf = s => (s.breakdown?.rankScore ?? s.score ?? 0);
+    const selected = suggestions.sort((a, b) => rankOf(b) - rankOf(a)).slice(0, limit);
+
+    // Coverage guarantee: ensure every wardrobe item appears in at least one outfit so the
+    // user's best pieces are never silently dropped. Anchor an extra outfit on each item
+    // that didn't make the ranked set, pairing it with its best partner from a
+    // complementary category (so we don't pair, e.g., two tops together).
+    const complementaryCategories = {
+      tops: ['bottoms', 'shoes', 'outerwear'],
+      kurta: ['bottoms', 'shoes', 'outerwear'],
+      bottoms: ['tops', 'shoes', 'outerwear'],
+      shoes: ['tops', 'bottoms', 'dresses'],
+      outerwear: ['tops', 'bottoms', 'shoes'],
+      dresses: ['shoes', 'accessories', 'outerwear'],
+      sarees: ['shoes', 'accessories'],
+      lehenga: ['shoes', 'accessories'],
+      accessories: ['tops', 'bottoms', 'dresses'],
+      traditional: ['shoes', 'accessories', 'outerwear'],
+    };
+    const usedIds = new Set(selected.flatMap(s => s.items.map(i => String(i._id))));
+    for (const item of filteredItems) {
+      if (usedIds.has(String(item._id))) continue;
+
+      const wanted = complementaryCategories[norm(item)] || [];
+      const others = filteredItems.filter(o => String(o._id) !== String(item._id));
+      // Prefer partners from a complementary category; fall back to anything available
+      let partnerPool = others.filter(o => wanted.includes(norm(o)));
+      if (partnerPool.length === 0) partnerPool = others;
+
+      const partnerMatches = this.findMatchesForItem(item, partnerPool, 1, userPrefs);
+      if (partnerMatches.length === 0) continue;
+
+      const items = [item, partnerMatches[0].item];
+      const scores = this.calculateOutfitScore(items, season, occasion);
+      selected.push({
+        items,
+        score: scores.overallMatch,
+        breakdown: scores,
+        why: this.explainMatch(item, partnerMatches[0].item, scores),
+        coverage: true
+      });
+      items.forEach(it => usedIds.add(String(it._id)));
+    }
+
+    return selected;
   }
 }
 

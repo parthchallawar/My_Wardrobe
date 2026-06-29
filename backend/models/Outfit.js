@@ -47,8 +47,11 @@ const outfitSchema = new mongoose.Schema({
     colorHarmony: { type: Number, default: 80 },
     styleConsistency: { type: Number, default: 80 },
     seasonality: { type: Number, default: 100 },
-    versatility: { type: Number, default: 75 }
+    versatility: { type: Number, default: 75 },
+    trendScore: { type: Number, default: 0 },
+    bestScore: { type: Number, default: 0 }
   },
+  trendReasons: [{ type: String }],
   generatedBy: {
     type: String,
     enum: ['ai', 'user', 'hybrid'],
