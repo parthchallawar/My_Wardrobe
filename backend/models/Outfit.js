@@ -58,6 +58,11 @@ const outfitSchema = new mongoose.Schema({
     default: 'ai'
   },
   timeOfDay: { type: String, enum: ['day', 'night', 'both'], default: 'both' },
+  weather: {
+    tempC: { type: Number, default: null },
+    condition: { type: String, default: null },
+    city: { type: String, default: null }
+  },
   isFavorite: { type: Boolean, default: false },
   wornCount: { type: Number, default: 0 },
   lastWorn: { type: Date, default: null },

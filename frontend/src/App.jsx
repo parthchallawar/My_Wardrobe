@@ -10,10 +10,12 @@ import Dashboard from './pages/Dashboard';
 import Wardrobe from './pages/Wardrobe';
 import ItemDetail from './pages/ItemDetail';
 import Outfits from './pages/Outfits';
+import OutfitDetail from './pages/OutfitDetail';
 import ShopMatch from './pages/ShopMatch';
 import Insights from './pages/Insights';
 import Settings from './pages/Settings';
 import WearCalendar from './pages/WearCalendar';
+import TodaysAppearance from './pages/TodaysAppearance';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -179,6 +181,23 @@ function App() {
                     }
                   />
                   <Route
+                    path="/outfits/:id"
+                    element={
+                      <motion.div
+                        key="outfit-detail"
+                        variants={pageVariants}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        transition={pageTransition}
+                      >
+                        <ProtectedRoute>
+                          <OutfitDetail />
+                        </ProtectedRoute>
+                      </motion.div>
+                    }
+                  />
+                  <Route
                     path="/shop-match"
                     element={
                       <motion.div
@@ -242,6 +261,23 @@ function App() {
                       >
                         <ProtectedRoute>
                           <WearCalendar />
+                        </ProtectedRoute>
+                      </motion.div>
+                    }
+                  />
+                  <Route
+                    path="/today"
+                    element={
+                      <motion.div
+                        key="today"
+                        variants={pageVariants}
+                        initial="initial"
+                        animate="animate"
+                        exit="exit"
+                        transition={pageTransition}
+                      >
+                        <ProtectedRoute>
+                          <TodaysAppearance />
                         </ProtectedRoute>
                       </motion.div>
                     }

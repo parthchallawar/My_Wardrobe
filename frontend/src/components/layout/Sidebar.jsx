@@ -12,11 +12,13 @@ import {
   ChevronRight,
   ChevronLeft,
   User,
+  Sun,
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: Home },
+  { path: '/today', label: "Today's Look", icon: Sun },
   { path: '/wardrobe', label: 'Wardrobe', icon: Shirt },
   { path: '/outfits', label: 'Outfits', icon: Sparkles },
   { path: '/shop-match', label: 'Shop Match', icon: ShoppingCart },

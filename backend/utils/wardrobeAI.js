@@ -588,6 +588,76 @@ class WardrobeAI {
     return 10;
   }
 
+  static titleCase(s) {
+    return String(s || '').trim().replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  /**
+   * Generate a human, descriptive name for an outfit based on what it actually is —
+   * its colour story, standout fabric, style/aesthetic and the occasion — instead of a
+   * generic "AI Generated Outfit N". Returns a clean 2-3 word title.
+   */
+  static nameOutfit(items, breakdown = {}, options = {}) {
+    if (!items || items.length === 0) return 'Outfit';
+    const lc = v => String(v || '').toLowerCase();
+
+    // Dominant style / aesthetic across the pieces
+    const styleCounts = {};
+    items.forEach(i => {
+      const st = lc(i.styling?.style || i.style);
+      if (st) styleCounts[st] = (styleCounts[st] || 0) + 1;
+      (Array.isArray(i.styling?.aesthetic) ? i.styling.aesthetic : []).forEach(a => {
+        const k = lc(a);
+        if (k) styleCounts[k] = (styleCounts[k] || 0) + 0.5;
+      });
+    });
+    const style = Object.entries(styleCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    // Standout fabric/material (most "characterful" first)
+    const fabricPriority = ['denim', 'leather', 'linen', 'corduroy', 'suede', 'flannel', 'knit', 'wool', 'satin', 'silk'];
+    const anchorFabric = fabricPriority.find(f =>
+      items.some(i => lc(i.construction?.fabric || i.fabric).includes(f))
+    );
+
+    // Colour story
+    const reasons = Array.isArray(breakdown.trendReasons) ? breakdown.trendReasons : [];
+    const tonal = reasons.some(r => /tonal|monochrome/i.test(r));
+    const allNeutral = items.every(i => this.isNeutralColor(i.color?.primary?.hex, i.color?.primary?.name));
+    const famCounts = {};
+    items.forEach(i => {
+      const f = lc(i.color?.primary?.family || i.color?.primary?.name);
+      if (f && !['multi', 'mixed', 'multicolor'].includes(f)) famCounts[f] = (famCounts[f] || 0) + 1;
+    });
+    const domFamily = Object.entries(famCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    const season = options.season && options.season !== 'all-season' ? options.season : null;
+    const occasion = options.occasion && options.occasion !== 'everyday' ? options.occasion : null;
+    const evening = options.timeOfDay === 'night';
+
+    // Closing noun reflects the vibe
+    let noun = 'Look';
+    if (occasion === 'formal' || style === 'formal' || style === 'glam') noun = 'Ensemble';
+    else if (['streetwear', 'sporty'].includes(style)) noun = 'Fit';
+    else if ((breakdown.trendScore || 0) >= 75) noun = 'Edit';
+
+    // Assemble up to two leading descriptors + noun
+    const parts = [];
+    if (tonal || allNeutral) parts.push('Tonal');
+    else if (domFamily) parts.push(this.titleCase(domFamily));
+
+    if (anchorFabric) parts.push(this.titleCase(anchorFabric));
+    else if (style && !parts.map(lc).includes(style)) parts.push(this.titleCase(style));
+
+    // If we still only have one descriptor, enrich with season / occasion / time
+    if (parts.length < 2) {
+      const extra = season || occasion || (evening ? 'evening' : null) || style;
+      if (extra && !parts.map(lc).includes(lc(extra))) parts.push(this.titleCase(extra));
+    }
+
+    const name = [...parts, noun].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    return name || 'Everyday Look';
+  }
+
   /**
    * Calculate comprehensive outfit score
    */

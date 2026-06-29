@@ -1,11 +1,30 @@
 const express = require('express');
 const Item = require('../models/Item');
 const Outfit = require('../models/Outfit');
+const User = require('../models/User');
 const WardrobeAI = require('../utils/wardrobeAI');
 const authMiddleware = require('../middleware/auth');
 const WearLog = require('../models/WearLog');
 
 const router = express.Router();
+
+/**
+ * Derive a clothing season from the current temperature (°C). Falls back to the
+ * calendar month when no temperature is supplied (e.g. geolocation denied).
+ */
+function deriveSeason(tempC) {
+  if (typeof tempC !== 'number' || Number.isNaN(tempC)) {
+    const m = new Date().getMonth();
+    if ([11, 0, 1].includes(m)) return 'winter';
+    if ([2, 3, 4].includes(m)) return 'spring';
+    if ([5, 6, 7].includes(m)) return 'summer';
+    return 'fall';
+  }
+  if (tempC < 8) return 'winter';
+  if (tempC < 16) return 'fall';
+  if (tempC < 24) return 'spring';
+  return 'summer';
+}
 
 /**
  * @route   GET /api/outfits
@@ -72,7 +91,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
  */
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { name, items, season, occasion, style, notes } = req.body;
+    const { name, items, season, occasion, style, notes, weather, timeOfDay } = req.body;
 
     // Validate that all items belong to the user
     const itemIds = items.map(i => i.item);
@@ -114,6 +133,11 @@ router.post('/', authMiddleware, async (req, res) => {
       style,
       colorScheme,
       aiScore,
+      trendReasons: Array.isArray(aiScore.trendReasons) ? aiScore.trendReasons.slice(0, 4) : [],
+      timeOfDay: ['day', 'night', 'both'].includes(timeOfDay) ? timeOfDay : 'both',
+      weather: weather && typeof weather === 'object'
+        ? { tempC: weather.tempC ?? null, condition: weather.condition || null, city: weather.city || null }
+        : undefined,
       generatedBy: 'user',
       notes
     });
@@ -305,6 +329,13 @@ router.post('/generate', authMiddleware, async (req, res) => {
       return isNaN(n) ? fallback : Math.round(Math.min(100, Math.max(0, n)));
     };
 
+    // Track names so duplicates within a batch get a distinguishing suffix
+    const nameCounts = {};
+    const uniqueName = (base) => {
+      nameCounts[base] = (nameCounts[base] || 0) + 1;
+      return nameCounts[base] === 1 ? base : `${base} ${nameCounts[base]}`;
+    };
+
     // Convert suggestions to outfit format
     const generatedOutfits = suggestions.map((suggestion, index) => {
       const colors = suggestion.items.flatMap(item =>
@@ -315,8 +346,14 @@ router.post('/generate', authMiddleware, async (req, res) => {
       const style = validStyles.includes(rawStyle) ? rawStyle : 'casual';
       const bd = suggestion.breakdown || {};
 
+      const baseName = WardrobeAI.nameOutfit(suggestion.items, bd, {
+        season: options.season,
+        occasion: options.occasion,
+        timeOfDay: options.timeOfDay
+      });
+
       return {
-        name: `AI Generated Outfit ${index + 1}`,
+        name: uniqueName(baseName),
         items: suggestion.items.map(item => ({
           item: item._id,
           type: categoryToType[item.category] || 'top'
@@ -360,6 +397,100 @@ router.post('/generate', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Generate outfits error:', error);
     res.status(500).json({ error: 'Server error generating outfits' });
+  }
+});
+
+/**
+ * @route   POST /api/outfits/today
+ * @desc    Generate a single "look of the day" based on today's weather, time of day,
+ *          and rotation (favours least-worn pieces). Ephemeral — not saved unless the
+ *          user explicitly saves it via POST /outfits.
+ * @access  Private
+ */
+router.post('/today', authMiddleware, async (req, res) => {
+  try {
+    const { lat, lon, timeOfDay } = req.body || {};
+    let { tempC, condition } = req.body || {};
+    let city = null;
+
+    const wardrobeItems = await Item.find({ user: req.user.id, isAvailable: true }).lean();
+    if (wardrobeItems.length < 2) {
+      return res.status(400).json({ error: 'Add at least 2 items to your wardrobe to generate a look' });
+    }
+
+    // Fetch live weather server-side so the OpenWeather key stays private. The frontend
+    // only sends coordinates (from browser geolocation).
+    if (tempC == null && lat != null && lon != null && process.env.OPENWEATHER_API) {
+      try {
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${process.env.OPENWEATHER_API}`;
+        const r = await fetch(url);
+        if (r.ok) {
+          const w = await r.json();
+          if (typeof w.main?.temp === 'number') tempC = w.main.temp;
+          condition = w.weather?.[0]?.main || condition;
+          city = w.name || null;
+        } else {
+          console.warn('OpenWeather responded', r.status);
+        }
+      } catch (e) {
+        console.warn('Weather fetch failed:', e.message);
+      }
+    }
+
+    const season = deriveSeason(typeof tempC === 'number' ? tempC : undefined);
+    const hour = new Date().getHours();
+    const tod = timeOfDay || (hour >= 18 || hour < 6 ? 'night' : 'day');
+
+    const user = await User.findById(req.user.id).select('preferences').lean();
+    const suggestions = WardrobeAI.generateOutfitSuggestions(wardrobeItems, {
+      season,
+      occasion: 'everyday',
+      timeOfDay: tod,
+      limit: 8,
+      userPrefs: user?.preferences || null
+    });
+
+    if (!suggestions.length) {
+      return res.status(404).json({ error: 'Could not assemble a look from your wardrobe' });
+    }
+
+    // For "today" we blend match quality with rotation freshness so unworn pieces surface.
+    const todayScore = (s) => {
+      const avgWear = s.items.reduce((a, i) => a + (i.wearCount || 0), 0) / s.items.length;
+      const freshness = Math.max(0, 25 - Math.min(25, avgWear * 3));
+      return (s.breakdown?.rankScore ?? s.score ?? 0) + freshness;
+    };
+    const ranked = [...suggestions].sort((a, b) => todayScore(b) - todayScore(a));
+
+    const shape = (s) => ({
+      name: WardrobeAI.nameOutfit(s.items, s.breakdown, { season, timeOfDay: tod }),
+      items: s.items.map(i => ({
+        _id: i._id,
+        name: i.name,
+        category: i.category,
+        image: i.imageBase64 || i.imageUrl || i.images?.[0]?.url || null,
+        color: i.color?.primary?.hex || i.colors?.[0]?.hex || null,
+        wearCount: i.wearCount || 0
+      })),
+      aiScore: s.breakdown,
+      trendReasons: s.breakdown?.trendReasons || [],
+      why: s.why || []
+    });
+
+    res.json({
+      weather: {
+        tempC: typeof tempC === 'number' ? Math.round(tempC) : null,
+        condition: condition || null,
+        city,
+        season,
+        timeOfDay: tod
+      },
+      look: shape(ranked[0]),
+      alternates: ranked.slice(1, 3).map(shape)
+    });
+  } catch (error) {
+    console.error("Today's look error:", error);
+    res.status(500).json({ error: "Server error generating today's look" });
   }
 });
 

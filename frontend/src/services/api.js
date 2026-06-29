@@ -143,6 +143,7 @@ export const outfitsAPI = {
   toggleFavorite: (id) => api.post(`/outfits/${id}/favorite`),
   recordWear: (id) => api.post(`/outfits/${id}/wear`),
   generate: (data) => api.post('/outfits/generate', data),
+  generateToday: (data) => api.post('/outfits/today', data),
 };
 
 // AI API
